@@ -1,17 +1,37 @@
-# app.py
 import streamlit as st
 import requests
 
-# 设置 Streamlit 应用的标题
-st.title("交互式对话窗口")
+# Define the FastAPI endpoints
+LOAD_MODEL_URL = "http://127.0.0.1:8000/load_model/"
+CHAT_URL = "http://127.0.0.1:8000/chat/"
 
-# 创建一个文本输入框
-user_input = st.text_input("请输入你的消息:")
+# Function to load the model
+def load_model():
+    response = requests.post(LOAD_MODEL_URL)
+    if response.status_code == 200:
+        st.success("Model loaded successfully!")
+    else:
+        st.error("Failed to load the model.")
 
-if st.button("发送"):
-    # 发送消息到 FastAPI 后端
-    response = requests.post("http://127.0.0.1:8000/chat/", json={"text": user_input})
-    response_data = response.json()
-    
-    # 显示 FastAPI 后端的响应
-    st.write("对话系统回应:", response_data["response"])
+# Function to send a message to the chat endpoint
+def chat(message):
+    response = requests.post(CHAT_URL, json={"text": message})
+    if response.status_code == 200:
+        return response.json().get("response", "No response received.")
+    else:
+        return "Failed to get a response."
+
+# Streamlit interface
+st.title("LLM Chatbot Interface")
+
+# Button to load the model
+if st.button("Load Model"):
+    load_model()
+
+# Text input for chat
+user_input = st.text_input("You:", "")
+
+# Display chat response
+if st.button('send'):
+    response = chat(user_input)
+    st.text_area("Response:", value=response, height=100)
