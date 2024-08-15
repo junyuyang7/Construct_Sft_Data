@@ -1,37 +1,73 @@
 import streamlit as st
 import requests
+from streamlit_chatbox import ChatBox
+from streamlit_option_menu import option_menu
+from web_pages.dialogue_page.dialogue import dialogue_page
+from web_pages.construct_page.construct import construct_page
+# from web_pages.dialogue_page.dialogue import dialogue_page
+# from web_pages.dialogue_page.dialogue import dialogue_page
+import os
+import sys
+import uuid
 
-# Define the FastAPI endpoints
-LOAD_MODEL_URL = "http://127.0.0.1:8000/load_model/"
-CHAT_URL = "http://127.0.0.1:8000/chat/"
+# def construct_page():
+#     st.title("Construct Data page")
+    
+if __name__ == "__main__":
+    st.set_page_config(
+        "Construct SFT Data",
+        os.path.join("img", "favicon.png"),
+        initial_sidebar_state="expanded",
+        menu_items={
+            'Get Help': 'https://google.com',
+            'Report a bug': "https://google.com",
+            'About': f"""欢迎使用 Construct SFT Data WebUI！"""
+        }
+    )
 
-# Function to load the model
-def load_model():
-    response = requests.post(LOAD_MODEL_URL)
-    if response.status_code == 200:
-        st.success("Model loaded successfully!")
-    else:
-        st.error("Failed to load the model.")
+    pages = {
+        "对话测试": {
+            "icon": "chat",
+            "func": dialogue_page,
+        },
+        "批量上传": {
+            "icon": "hdd-stack",
+            "func": construct_page,
+        },
+        # "对话测试": {
+        #     "icon": "chat",
+        #     "func": prompt_base_page,
+        # },
+        # "数据管理": {
+        #     "icon": "hdd-stack",
+        #     "func": sftdata_base_page,
+        # },
+    }
 
-# Function to send a message to the chat endpoint
-def chat(message):
-    response = requests.post(CHAT_URL, json={"text": message})
-    if response.status_code == 200:
-        return response.json().get("response", "No response received.")
-    else:
-        return "Failed to get a response."
+    with st.sidebar:
+        st.image(
+            os.path.join(
+                "img",
+                "favicon.png"
+            ),
+            use_column_width=True
+        )
+        st.caption(
+            f"""<p align="right">当前版本：0</p >""",
+            unsafe_allow_html=True,
+        )
+        options = list(pages)
+        icons = [x["icon"] for x in pages.values()]
 
-# Streamlit interface
-st.title("LLM Chatbot Interface")
+        default_index = 0
+        selected_page = option_menu(
+            "",
+            options=options,
+            icons=icons,
+            # menu_icon="chat-quote",
+            default_index=default_index,
+        )
 
-# Button to load the model
-if st.button("Load Model"):
-    load_model()
-
-# Text input for chat
-user_input = st.text_input("You:", "")
-
-# Display chat response
-if st.button('send'):
-    response = chat(user_input)
-    st.text_area("Response:", value=response, height=100)
+    if selected_page in pages:
+        # pages[selected_page]["func"](api=api)
+        pages[selected_page]["func"]()
