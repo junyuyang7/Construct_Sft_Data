@@ -16,6 +16,9 @@ class DialogConstruct(DataConstructer):
         Session = sessionmaker(bind=engine)
         self.session = Session()
 
+    # def construct_new_prompt(self):
+
+
     def get_prompt(self, domain_name, task_name, cls_name, model_type) -> dict:
         prompt = self.db.get_prompt_by_domain_task_cls_type(self.session, domain_name, task_name, cls_name, model_type)
         try:
@@ -37,7 +40,7 @@ class DialogConstruct(DataConstructer):
             message.append({'role': 'assistant', 'content': answer})
         return message
 
-    def construct_one(self, domain_name, task_name, cls_name, score_threhold=5, turn=2):
+    def construct_one(self, domain_name, task_name, cls_name, score_threhold=5, turn=2, construct_myself=False):
         # 储存在inputs和targets中
         self.inputs = []
         self.targets = []
@@ -50,7 +53,9 @@ class DialogConstruct(DataConstructer):
         self.judge_prompt = self.get_prompt(domain_name, task_name, cls_name, model_type='Judge Model')
 
         # 自己创建每一步的prompt
-
+        # if construct_myself:
+        #     self.topic_prompt, self.ask_prompt, self.answer_prompt, self.judge_prompt = self.construct_new_prompt()
+        
         # 构建用户query
         query = self.get_query_from_topic(topic=domain_name, prompt=self.topic_prompt)
         self.inputs.append(query.strip())

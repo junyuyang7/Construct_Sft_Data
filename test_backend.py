@@ -3,10 +3,13 @@ from pydantic import BaseModel
 import uvicorn
 from typing import *
 import os
+from Script.create_db import DBconnecter
+from Script.data_base.kb_service import DBService
 # from transformers import AutoConfig, AutoModel, AutoTokenizer, LlamaForCausalLM
 # from utils import xuanji_api
 
 UPLOAD_DIRECTORY = "./uploaded_files"
+os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
 
 app = FastAPI()
 
@@ -19,9 +22,30 @@ class Message(BaseModel):
     message: list
 
 class Basefile(BaseModel):
-    text: str
-    model_name: str
-    message: list
+    file_names: List[str]
+    files: List[UploadFile]
+
+class PromptBase(BaseModel):
+    prompt_id: Union[int, None]
+    keyword: Union[str, None]
+    domain_name: Union[str, None]
+    task_name: Union[str, None]
+    cls_name: Union[str, None]
+    model_type: Union[str, None]
+    prompt: Union[str, None]
+    args: Union[str, None]
+
+class SFTDataBase(BaseModel):
+    uniqueId = Union[int, None]
+    inputs = Union[list, None]
+    targets = Union[list, None]
+    turn = Union[int, None]
+    domain_name: Union[str, None]
+    task_name: Union[str, None]
+    cls_name: Union[str, None]
+    prompt: Union[str, None]
+    score = Union[int, None]
+    history = Union[str, None]
 
 model = None
 tokenizer = None
@@ -52,6 +76,7 @@ tokenizer = None
     
 #     return {"response": outputs}
 
+
 @app.post("/chat/")
 async def chat(message: Message):
     
@@ -65,15 +90,53 @@ async def chat(message: Message):
     
     return {"response": resp}
 
+
 @app.post("/upload/")
-async def upload(files: List[UploadFile] = File(...)):
+async def upload(files: List[UploadFile]):
+    results = []
     for file in files:
         # 保存上传的文件到指定目录
         file_location = os.path.join(UPLOAD_DIRECTORY, file.filename)
         with open(file_location, "wb") as f:
             f.write(await file.read())
+        results.append(file.filename)
 
-    return {"filenames": [file.filename for file in files]}
+    return {"filenames": results}
+
+# prompt_base api
+@app.post('/prompt_upload/')
+async def prompt_upload(prompt_data: PromptBase):
+    db = DBService(table_name='prompt_model')
+    args = prompt_data.args.split()
+    status = db.insert_data(prompt_data.domain_name, prompt_data.task_name, prompt_data.cls_name, prompt_data.model_type, prompt_data.prompt, prompt_data.args)
+    return {'status': status, 'prompt_data': prompt_data.model_dump()}
+
+@app.post('/prompt_list/')
+async def prompt_list():
+    db = DBService(table_name='prompt_model')
+    prompt_dict = db.get_all_data()
+    return {'data': prompt_dict}
+    
+@app.post('/prompt_delete/')
+async def prompt_delete(prompt_data: PromptBase):
+    db = DBService(table_name='prompt_model')
+    resp = db.delete_data(prompt_data.prompt_id)
+    return {'status': resp}
+
+@app.post('/prompt_search_keyword/')
+async def prompt_search(prompt_data: PromptBase):
+    db = DBService(table_name='prompt_model')
+    status, prompt_dict = db.get_data_by_keyword(prompt_data.keyword)
+    return {'status': status, 'data': prompt_dict}
+
+@app.post('/prompt_update/')
+async def prompt_update(prompt_data: PromptBase):
+    db = DBService(table_name='prompt_model')
+    resp = db.update_data(prompt_data.prompt_id, domain_name=prompt_data.domain_name, task_name=prompt_data.task_name, cls_name=prompt_data.cls_name, model_type=prompt_data.model_type, prompt=prompt_data.prompt, args=prompt_data.args)
+    return {'status': resp, 'prompt_data': prompt_data.model_dump()}
+
+# SftData_base api
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8010)

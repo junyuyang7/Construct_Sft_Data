@@ -34,7 +34,7 @@ FSCHAT_OPENAI_API = {
 # 这些模型必须是在model_config.MODEL_PATH或ONLINE_MODEL中正确配置的。
 # 在启动startup.py时，可用通过`--model-name xxxx yyyy`指定模型，不指定则为LLM_MODELS
 
-FSCHAT_MODEL_WORKERS = {
+MODEL_WORKERS = {
     # 所有模型共用的默认配置，可在模型专项配置中进行覆盖。
     "default": {
         "host": DEFAULT_BIND_HOST,

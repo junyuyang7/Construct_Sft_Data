@@ -5,6 +5,21 @@ import os
 import logging
 from pathlib import Path
 import httpx
+from pydantic import BaseModel
+import pydantic
+
+class BaseResponse(BaseModel):
+    code: int = pydantic.Field(200, description="API status code")
+    msg: str = pydantic.Field("success", description="API status message")
+    data: Any = pydantic.Field(None, description="API data")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "code": 200,
+                "msg": "success",
+            }
+        }
 
 # 检测设备
 def detect_device() -> Literal["cuda", "mps", "cpu"]:
@@ -247,3 +262,4 @@ def get_httpx_client(
         return httpx.AsyncClient(**kwargs)
     else:
         return httpx.Client(**kwargs)
+    

@@ -81,7 +81,7 @@ def dialogue_page():
         st.session_state['history'].append({'role': 'user', 'content': prompt})
         st.session_state['history'].append({'role': 'assistant', 'content': text})
 
-        print(st.session_state['history'])
+        # print(st.session_state['history'])
         # for t in r:
         #     if error_msg := check_error_msg(t):  # check whether error occured
         #         st.error(error_msg)

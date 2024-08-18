@@ -4,8 +4,8 @@ from streamlit_chatbox import ChatBox
 from streamlit_option_menu import option_menu
 from web_pages.dialogue_page.dialogue import dialogue_page
 from web_pages.construct_page.construct import construct_page
-# from web_pages.dialogue_page.dialogue import dialogue_page
-# from web_pages.dialogue_page.dialogue import dialogue_page
+from web_pages.prompt_base_page.prompt_base import prompt_base_page
+from web_pages.dialogue_page.dialogue import dialogue_page
 import os
 import sys
 import uuid
@@ -30,18 +30,18 @@ if __name__ == "__main__":
             "icon": "chat",
             "func": dialogue_page,
         },
-        "批量上传": {
+        "批量构造": {
             "icon": "hdd-stack",
             "func": construct_page,
         },
-        # "对话测试": {
-        #     "icon": "chat",
-        #     "func": prompt_base_page,
-        # },
-        # "数据管理": {
-        #     "icon": "hdd-stack",
-        #     "func": sftdata_base_page,
-        # },
+        "Prompt管理": {
+            "icon": "hdd-stack",
+            "func": prompt_base_page,
+        },
+        "SFT数据管理": {
+            "icon": "hdd-stack",
+            "func": sftdata_base_page,
+        },
     }
 
     with st.sidebar:

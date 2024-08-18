@@ -1,6 +1,7 @@
 from Script.db.models.prompt_base import PromptModel
 from Script.db.session import with_session
 from typing import List
+import pandas as pd
 
 @with_session
 def add_prompt_to_db(session, domain_name, task_name, cls_name, model_type, prompt, args):
@@ -35,7 +36,15 @@ def add_prompt_to_db(session, domain_name, task_name, cls_name, model_type, prom
 @with_session
 def list_prompts_from_db(session) -> List:
     '''列出数据库中含有的prompt'''
-    return session.query(PromptModel).all()
+    prompts = session.query(PromptModel).all()
+    prompts_dict_list = [prompt.__dict__ for prompt in prompts]
+
+    # 删除字典中的 _sa_instance_state，这是SQLAlchemy的内部属性
+    for item in prompts_dict_list:
+        item.pop('_sa_instance_state', None)
+    # df = pd.DataFrame(prompts_dict_list)
+    # print(df)
+    return prompts_dict_list
 
 @with_session
 def prompt_exists(session, prompt):
@@ -45,6 +54,15 @@ def prompt_exists(session, prompt):
     return status
 
 @with_session
+def find_prompt_from_keyword(session, keyword):
+    '''根据关键字搜索对应的prompt'''
+    prompt_tmp = session.query(PromptModel).filter(PromptModel.prompt.ilike(f"%{keyword}%")).all()
+    if prompt_tmp:
+        prompts_dict_list = [prompt.__dict__ for prompt in prompt_tmp]
+        return True, prompts_dict_list
+    return False, {}
+
+@with_session
 def delete_prompt_from_db(session, prompt_id):
     '''从数据库中删除对应prompt'''
     prompt = session.query(PromptModel).filter(PromptModel.id == prompt_id).first()
@@ -52,18 +70,14 @@ def delete_prompt_from_db(session, prompt_id):
         session.delete(prompt)
     return True
 
-# @with_session
-# def get_kb_detail(session, kb_name: str) -> dict:
-#     '''获取知识库的详细信息'''
-#     kb: PromptModel = session.query(PromptModel).filter(PromptModel.id.ilike(kb_name)).first()
-#     if kb:
-#         return {
-#             "kb_name": kb.kb_name,
-#             "kb_info": kb.kb_info,
-#             "vs_type": kb.vs_type,
-#             "embed_model": kb.embed_model,
-#             "file_count": kb.file_count,
-#             "create_time": kb.create_time,
-#         }
-#     else:
-#         return {}
+@with_session
+def update_prompt_from_db(session, prompt_id, **kwargs):
+    '''从数据库中删除对应prompt'''
+    prompt = session.query(PromptModel).filter(PromptModel.id == prompt_id).first()
+    if prompt:
+        for key, value in kwargs.items():
+            if hasattr(prompt, key):
+                setattr(prompt, key, value)
+        session.commit()
+        return True
+    return False
