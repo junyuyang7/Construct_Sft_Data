@@ -5,7 +5,7 @@ from streamlit_option_menu import option_menu
 from web_pages.dialogue_page.dialogue import dialogue_page
 from web_pages.construct_page.construct import construct_page
 from web_pages.prompt_base_page.prompt_base import prompt_base_page
-from web_pages.dialogue_page.dialogue import dialogue_page
+from web_pages.dialogue_page.dialogue import sftdata_base_page
 import os
 import sys
 import uuid
