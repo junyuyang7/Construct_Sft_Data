@@ -4,12 +4,12 @@
 # 3.删除数据库中的sftdata 
 # 4.修改数据库中的sftdata 
 
-from Script.db.models import PromptModel
+# from Script.db.models import PromptModel
 from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy import Column, Integer, String, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from Script.create_db import DBconnecter
+# from Script.create_db import DBconnecter
 import requests
 import streamlit as st
 from st_aggrid import AgGrid, JsCode, GridUpdateMode

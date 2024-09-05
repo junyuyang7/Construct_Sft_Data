@@ -5,7 +5,8 @@ from streamlit_option_menu import option_menu
 from web_pages.dialogue_page.dialogue import dialogue_page
 from web_pages.construct_page.construct import construct_page
 from web_pages.prompt_base_page.prompt_base import prompt_base_page
-from web_pages.dialogue_page.dialogue import dialogue_page
+from web_pages.sftdata_base_page.sftdata_base import sftdata_base_page
+from web_pages.test_page.test import test_page
 import os
 import sys
 import uuid
@@ -41,6 +42,10 @@ if __name__ == "__main__":
         "SFT数据管理": {
             "icon": "hdd-stack",
             "func": sftdata_base_page,
+        },
+        "测试页面": {
+            "icon": "hdd-stack",
+            "func": test_page,
         },
     }
 
