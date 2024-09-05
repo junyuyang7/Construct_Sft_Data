@@ -51,7 +51,7 @@ def dialogue_page():
         )
         chat_box.init_session()
 
-    # Sidebar
+    # 选择什么模型？
     with st.sidebar:
         # Button to load the model
         global model_name

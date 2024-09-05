@@ -1,3 +1,10 @@
+# 功能：
+# 1.上传关键字对应的文件，并决定是否需要保存 
+# 2.解析文件中关键字的数据，并将数据填入对应的prompt中的{$keyword} 
+# 3.text框填写prompt（或者再prompt_base_page中选择对应的prompt） 
+# 4.获取所有的prompt数据进行批量构造数据并返回xlsx文件(prompt, answer) 
+# 5.对返回的xlsx文件进行在线编辑，删除、修改等
+
 import streamlit as st
 import requests
 from streamlit_chatbox import ChatBox
@@ -5,51 +12,76 @@ from streamlit_option_menu import option_menu
 from fastapi import UploadFile
 import os
 from typing import *
+from Script.config import KEYWORD_FILE, DATA_FILE
+import pandas as pd
+import re
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, AgGridTheme
+from st_aggrid.shared import JsCode
+import json
+import sys
+
+sys.path.append(os.path.dirname(__file__))
+
+from construct_query import test_query
+from construct_answer import test_answer
+from data_evaluate import test_evaluate
+from prompt_choose import test_prompt
 
 UPLOAD_URL = "http://127.0.0.1:8010/upload/"
+PROMPT_LIST = "http://127.0.0.1:8010/prompt_list/"
+CHAT_URL = "http://127.0.0.1:8010/chat/"
 UPLOAD_DIRECTORY = "test"
 
 def construct_page():
+    def on_mode_change():
+        mode = st.session_state.mode
+        text = f"请 {mode} "
+        st.toast(text)
+
     st.title("Construct Data page")
+    st.text('选择你要进行的步骤')
 
-    def upload(files):
-        files_upload = [("files", (file.name, file, file.type)) for file in files]
-        response = requests.post(UPLOAD_URL, files=files_upload)
-        if response.status_code == 200:
-            st.success("Files upload successfully!")
-            return response.json().get("filenames", [])
-        else:
-            st.error("Failed to upload files.")
-            return []
-    
-    # 使用 st.file_uploader 上传多个文件
-    uploaded_files = st.file_uploader("选择文件", accept_multiple_files=True)
-    if uploaded_files:
-        resp = upload(uploaded_files)
-        st.write("文件上传成功：", set(resp))
-    
-    # # 检查是否有文件上传
-    # if uploaded_files:
-    #     for uploaded_file in uploaded_files:
-    #         # 读取文件内容
-    #         file_details = {
-    #             "filename": uploaded_file.name,
-    #             "filetype": uploaded_file.type,
-    #             "filesize": uploaded_file.size
-    #         }
+    pages = {
+        "prompt选择": {
+            "icon": "chat",
+            "func": test_prompt,
+        },
+        "query构造": {
+            "icon": "hdd-stack",
+            "func": test_query,
+        },
+        "answer构造": {
+            "icon": "hdd-stack",
+            "func": test_answer,
+        },
+        "数据评估": {
+            "icon": "hdd-stack",
+            "func": test_evaluate,
+        },
+    }
+    with st.sidebar:
+        executor = [
+            'prompt选择',
+            'query构造',
+            'answer构造',
+            '数据评估',
+        ]
+        mode = st.selectbox("请选择构造的步骤：", executor, index=0, on_change=on_mode_change, key="mode")
 
-    #         # 在页面上显示文件详情
-    #         st.write(file_details)
+        # options = list(pages)
+        # icons = [x["icon"] for x in pages.values()]
 
-    #         # 显示文件内容（根据文件类型处理）
-    #         if uploaded_file.type == "text/plain":
-    #             # 读取并显示文本文件内容
-    #             text = uploaded_file.read().decode("utf-8")
-    #             st.text_area("文件内容", text)
-                
-    #         elif uploaded_file.type.startswith("image/"):
-    #             # 显示图片文件
-    #             st.image(uploaded_file, caption=uploaded_file.name)
-    #         else:
-    #             st.write("无法显示此文件类型的内容")
+        # default_index = 0
+        # selected_page = option_menu(
+        #     "",
+        #     options=options,
+        #     icons=icons,
+        #     # menu_icon="chat-quote",
+        #     default_index=default_index,
+        # )
+
+    if mode in pages:
+        # pages[selected_page]["func"](api=api)
+        pages[mode]["func"]()
+        
 

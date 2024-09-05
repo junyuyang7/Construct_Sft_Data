@@ -4,7 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from typing import *
 from pathlib import Path
-
+import pandas as pd
 import httpx
 import contextlib
 import json
@@ -15,6 +15,25 @@ from pprint import pprint
 from Script.config import HTTPX_DEFAULT_TIMEOUT, logger, log_verbose
 
 set_httpx_config()
+
+def xuan_ji(sample, model_name):
+    return 'this is resp'
+
+def construct_dialog(final_prompt_lst, turn_lst, model_name):
+    ans_df_lst = []
+    for i, prompt in enumerate(final_prompt_lst):
+        prom_lst, ans_lst, hist_lst = [], [], []
+        for sample in prompt['prompt']:
+            ans = xuan_ji(sample, model_name)
+            # hist = [{'role': 'user', 'content': sample}, {'role': 'assistant', 'content': ans}]
+            hist = json.dumps([{'role': 'user', 'content': sample}, {'role': 'assistant', 'content': ans}], ensure_ascii=False)
+            prom_lst.append(sample)
+            ans_lst.append(ans)
+            hist_lst.append(hist)
+        ans_df = pd.DataFrame({'prompt': prom_lst, 'answer': ans_lst, 'history': hist_lst})
+        ans_df_lst.append(ans_df)
+
+    return ans_df_lst
 
 class ApiRequest:
     '''

@@ -3,6 +3,9 @@ import os
 import tempfile
 import shutil
 
+# 指定文件保存的本地路径
+KEYWORD_FILE = 'output/keyword'
+DATA_FILE = 'output/data'
 
 # 是否显示详细日志
 log_verbose = True
