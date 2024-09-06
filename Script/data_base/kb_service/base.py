@@ -5,10 +5,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
 import sqlite3
+import json
 from abc import ABC, abstractmethod
 from sqlalchemy import create_engine, and_, or_, MetaData, text, inspect
 from sqlalchemy.orm import sessionmaker
-from Script.db.models import QueryPrompt, AnswerPrompt, EvaluatePrompt, SFTDataModel
+from Script.db.models import QueryPrompt, AnswerPrompt, EvaluatePrompt, AllPrompt, SFTDataModel
 from Script.db.repository import (PromptAction, add_history_to_db, list_history_from_db, find_history_from_keyword, history_exists, delete_history_from_db, update_history_from_db)
 from sqlalchemy.exc import SQLAlchemyError
 from utils import get_db_path
@@ -18,6 +19,7 @@ ModelType = {
     'answer_prompt': AnswerPrompt,
     'evaluate_prompt': EvaluatePrompt,
     'query_prompt': QueryPrompt,
+    'all_prompt': AllPrompt,
     'sftdata_model': SFTDataModel
 }
 
@@ -25,9 +27,10 @@ ModelAction = {
     'answer_prompt': PromptAction(prompt_type='answer_prompt'),
     'evaluate_prompt': PromptAction(prompt_type='evaluate_prompt'),
     'query_prompt': PromptAction(prompt_type='query_prompt'),
+    'all_prompt': PromptAction(prompt_type='all_prompt'),
 }
 
-table_lists = ['answer_prompt', 'sftdata_model']
+# table_lists = ['answer_prompt', 'sftdata_model']
 
 db_excutor = {
     'answer_prompt': {
@@ -50,6 +53,13 @@ db_excutor = {
         'find': ModelAction['query_prompt'].find_prompt_from_keyword,
         'delete': ModelAction['query_prompt'].delete_prompt_from_db,
         'update': ModelAction['query_prompt'].update_prompt_from_db
+    },
+    'all_prompt': {
+        'add': ModelAction['all_prompt'].add_prompt_to_db,
+        'list_all': ModelAction['all_prompt'].list_prompts_from_db,
+        'find': ModelAction['all_prompt'].find_prompt_from_keyword,
+        'delete': ModelAction['all_prompt'].delete_prompt_from_db,
+        'update': ModelAction['all_prompt'].update_prompt_from_db
     },
     'sftdata_model': {
         'add': add_history_to_db,
@@ -118,9 +128,30 @@ class DBService(ABC):
         session = Session()
         session.close()
 
-    def insert_data(self, domain_name, task_name, cls_name, prompt, args):
+    def insert_data(self, domain_name, task_name, cls_name, args, query_args, answer_args, evaluate_args, query_prompt, answer_prompt, evaluate_prompt, prompt):
+        # args 格式 aaa bbb ccc ddd; abc bcd dfg
+        args_json, query_json, answer_json, evaluate_json = None, None, None, None
+
+        if self.tabel_name == 'all_prompt':
+            query_args, answer_args, evaluate_args = query_args.split(';'), answer_args.split(';'), evaluate_args.split(';')
+
+            query_json = {'input_args': query_args[0].split(),
+                        'iter_args': query_args[1].split()}
+            answer_json = {'input_args': answer_args[0].split(),
+                        'iter_args': answer_args[1].split()}
+            evaluate_json = {'input_args': evaluate_args[0].split(),
+                        'iter_args': evaluate_args[1].split()}
+            
+            query_json, answer_json, evaluate_json = json.dumps(query_json), json.dumps(answer_json), json.dumps(evaluate_json)
+
+        else:
+            args = args.split(';')
+            args_json = {'input_args': args_json[0].split(),
+                     'iter_args': args_json[1].split()}
+            args_json = json.dumps(args_json)
+
         # 检查是否存在重复记录（排除id）
-        status = db_excutor[self.tabel_name]['add'](domain_name, task_name, cls_name, prompt, args)
+        status = db_excutor[self.tabel_name]['add'](domain_name, task_name, cls_name, args_json, query_json, answer_json, evaluate_json, query_prompt, answer_prompt, evaluate_prompt, prompt)
         return status
     
     def get_data_by_keyword(self, keyword):
@@ -155,13 +186,19 @@ if __name__ == '__main__':
     # print(status)
     db = DBService(tabel_name='query_prompt')
     status = db.recreate_table()
-    status = db.insert_data('test', 'test', 'test', 'test', 'test')
+    status = db.insert_data('test', 'test', 'test', 'test', 'test', 'test','test', 'test', 'test', 'test', 'test')
     print(status)
     db = DBService(tabel_name='answer_prompt')
-    status = db.insert_data('test', 'test', 'test', 'test', 'test')
+    status = db.recreate_table()
+    status = db.insert_data('test', 'test', 'test', 'test', 'test', 'test','test', 'test', 'test', 'test', 'test')
     print(status)
     db = DBService(tabel_name='evaluate_prompt')
-    status = db.insert_data('test', 'test', 'test', 'test', 'test')
+    status = db.recreate_table()
+    status = db.insert_data('test', 'test', 'test', 'test', 'test', 'test','test', 'test', 'test', 'test', 'test')
+    print(status)
+    db = DBService(tabel_name='all_prompt')
+    status = db.recreate_table()
+    status = db.insert_data('test', 'test', 'test', 'test', 'test', 'test','test', 'test', 'test', 'test', 'test')
     print(status)
     # from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table
     # from sqlalchemy.ext.declarative import declarative_base

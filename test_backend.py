@@ -36,8 +36,15 @@ class PromptBase(BaseModel):
     # model_type: Union[str, None]
     prompt: Union[str, None]
     args: Union[str, None]
+    query_prompt: Union[str, None]
+    answer_prompt: Union[str, None]
+    evaluate_prompt: Union[str, None]
+    query_args: Union[str, None]
+    answer_args: Union[str, None]
+    evaluate_args: Union[str, None]
 
 class PromptList(BaseModel):
+    prompt_id: Union[int, None]
     tabel_name: Union[str, None]
 
 class SFTDataBase(BaseModel):
@@ -115,8 +122,7 @@ async def upload(files: List[UploadFile]):
 @app.post('/prompt_upload/')
 async def prompt_upload(prompt_data: PromptBase):
     db = DBService(tabel_name=prompt_data.tabel_name)
-    args = prompt_data.args.split()
-    status = db.insert_data(prompt_data.domain_name, prompt_data.task_name, prompt_data.cls_name, prompt_data.prompt, prompt_data.args)
+    status = db.insert_data(prompt_data.domain_name, prompt_data.task_name, prompt_data.cls_name, prompt_data.args, prompt_data.query_args, prompt_data.answer_args, prompt_data.evaluate_args, prompt_data.query_prompt, prompt_data.answer_prompt, prompt_data.evaluate_prompt, prompt_data.prompt)
     return {'status': status, 'prompt_data': prompt_data.model_dump()}
 
 @app.post('/prompt_list/')
@@ -126,7 +132,7 @@ async def prompt_list(prompt_data: PromptList):
     return {'data': prompt_dict}
     
 @app.post('/prompt_delete/')
-async def prompt_delete(prompt_data: PromptBase):
+async def prompt_delete(prompt_data: PromptList):
     db = DBService(tabel_name=prompt_data.tabel_name)
     resp = db.delete_data(prompt_data.prompt_id)
     return {'status': resp}
@@ -140,7 +146,7 @@ async def prompt_search(prompt_data: PromptBase):
 @app.post('/prompt_update/')
 async def prompt_update(prompt_data: PromptBase):
     db = DBService(tabel_name=prompt_data.tabel_name)
-    resp = db.update_data(prompt_data.prompt_id, domain_name=prompt_data.domain_name, task_name=prompt_data.task_name, cls_name=prompt_data.cls_name, prompt=prompt_data.prompt, args=prompt_data.args)
+    resp = db.update_data(prompt_data.domain_name, prompt_data.task_name, prompt_data.cls_name, prompt_data.args, prompt_data.query_args, prompt_data.answer_args, prompt_data.evaluate_args, prompt_data.query_prompt, prompt_data.answer_prompt, prompt_data.evaluate_prompt, prompt_data.prompt)
     return {'status': resp, 'prompt_data': prompt_data.model_dump()}
 
 # SftData_base api

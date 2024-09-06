@@ -11,9 +11,13 @@ import re
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, AgGridTheme
 from st_aggrid.shared import JsCode
 import json
+from construct_query import test_query
 
 UPLOAD_URL = "http://127.0.0.1:8010/upload/"
 PROMPT_LIST = "http://127.0.0.1:8010/prompt_list/"
+
+# query_params = st.experimental_get_query_params()
+# current_page = query_params.get('page', ['prompt_choose'])[0]
 
 def test_prompt():
     def upload(files, save_path):
@@ -47,7 +51,7 @@ def test_prompt():
         return saved_filenames
     
     def list_all_prompt(tabel_name):
-        response = requests.post(PROMPT_LIST, json={'tabel_name': tabel_name})
+        response = requests.post(PROMPT_LIST, json={'tabel_name': tabel_name, 'prompt_id': None})
         if response.status_code == 200:
             st.success("Prompt list successfully!")
             return response.json().get('data', {})
@@ -56,22 +60,40 @@ def test_prompt():
             return {}
         
     def replace_prompt_keyword(prompt, keywords_data, replacements):
-        # 使用正则表达式提取 {$...} 格式的占位符
-        text = prompt['prompt']
-        pattern = r'\{\$(\w+)\}'
-        matches = re.findall(pattern, text)
-
         def replace_match(match):
             field_name = match.group(1)
             return str(replacements.get(field_name, match.group(0)))  # 用 replacements 字典中的新字符串替换
         
+        def process_prompts(prompts, pattern, replace_match):
+            """处理给定的 prompt 列表，匹配正则并替换"""
+            matches = []
+            for key in prompts:
+                # 查找匹配项并去重
+                prompt_matches = re.findall(pattern, prompts[key])
+                matches.extend(prompt_matches)
+                # 替换匹配项
+                prompts[key] = re.sub(pattern, replace_match, prompts[key])
+            # 返回去重后的所有匹配项
+            return list(set(matches)), prompts
+        
+        pattern = r'\{\$(\w+)\}'
+
+        # 使用正则表达式提取 {$...} 格式的占位符
+        if st.session_state['tabel_name'] == 'all_prompt':
+            prompts_dict = {
+                'query_prompt': prompt['query_prompt'],
+                'answer_prompt': prompt['answer_prompt'],
+                'evaluate_prompt': prompt['evaluate_prompt']
+            }
+            matches, new_prompt = process_prompts(prompts_dict, pattern, replace_match)
+        else:
+            matches, new_prompt = process_prompts({'prompt': prompt['prompt']}, pattern, replace_match)
+            
         for key in matches:
             if key not in keywords_data:
                 st.warning('选择的prompt中key和keyword文件中的key对不上')
 
-        new_text = re.sub(pattern, replace_match, text)
-
-        return new_text
+        return new_prompt
     
     # 切换模型
     def on_mode_change():
@@ -84,25 +106,39 @@ def test_prompt():
         final_prompt_lst = []
         for i, prompt in enumerate(selected_prompts):
             keywords_data = data[i][0].keys()
-            prompt_samples = []
+            if st.session_state['tabel_name'] == 'all_prompt':
+                prompt_samples = [[], [], []]
+                keys = ['query_prompt', 'answer_prompt', 'evaluate_prompt']
+            else:
+                prompt_samples = [[]]
+                keys = ['prompt']
             for sample in data[i]:
                 new_prompt = replace_prompt_keyword(prompt, keywords_data, sample)
-                prompt_samples.append(new_prompt)
-            prompt['prompt'] = prompt_samples
+                for j, key in enumerate(keys):
+                    prompt_samples[j].append(new_prompt[key])
+
+            if st.session_state['tabel_name'] == 'all_prompt':
+                prompt['query_prompt'] = prompt_samples[0]
+                prompt['answer_prompt'] = prompt_samples[1]
+                prompt['evaluate_prompt'] = prompt_samples[2]
+            else:
+                prompt['prompt'] = prompt_samples[0]
+                
             final_prompt_lst.append(prompt)
         return final_prompt_lst
     
     # 1.先展示prompt供用户选择
     tabel_name = st.text_input(
-        "是什么类型的prompt [query_prompt, answer_prompt, evaluate_prompt]",
+        "是什么类型的prompt [query_prompt, answer_prompt, evaluate_prompt, all_prompt]",
         key="tabel_name",
     )
-    if tabel_name in ['query_prompt', 'answer_prompt', 'evaluate_prompt']:
-    # 展示数据库中的prompt
-        prompt_data = list_all_prompt(tabel_name)
-        # data_df = pd.DataFrame(data)
+    if tabel_name in ['query_prompt', 'answer_prompt', 'evaluate_prompt', 'all_prompt']:
+        # 展示数据库中的prompt
+        prompt_data = list_all_prompt(tabel_name, )
+        data_df = pd.DataFrame(prompt_data)
+        
         options = [
-            f"{item['prompt']} (domain_name: {item['domain_name']}, task_name: {item['task_name']}, cls_name: {item['cls_name']}, args: {item['args']})"
+            f"domain_name: {item['domain_name']}, task_name: {item['task_name']}, cls_name: {item['cls_name']}"
             for item in prompt_data
         ]
         selected_options = st.multiselect(
@@ -112,27 +148,38 @@ def test_prompt():
         selected_prompts = []
         if selected_options:
             selected_prompts = [
-                item for item in prompt_data if f"{item['prompt']} (domain_name: {item['domain_name']}, task_name: {item['task_name']}, cls_name: {item['cls_name']}, args: {item['args']})" in selected_options
+                item for item in prompt_data if f"domain_name: {item['domain_name']}, task_name: {item['task_name']}, cls_name: {item['cls_name']}" in selected_options
             ]
-            # 显示选择的 prompts 及其详细信息
+            # 显示选择的 prompts模板 及其详细信息
             for prompt_info in selected_prompts:
-                st.write(f"Prompt: {prompt_info['prompt']}")
+                if tabel_name == 'all_prompt':
+                    st.write(f"Query_Prompt: {prompt_info['query_prompt']}") 
+                    st.write(f"Answer_Prompt: {prompt_info['answer_prompt']}")
+                    st.write(f"Evaluate_Prompt: {prompt_info['evaluate_prompt']}")
+                else:
+                    st.write(f"Prompt: {prompt_info['prompt']}")
 
         # 使用 st.file_uploader 上传多个文件并获取 keyword 
         uploaded_files = st.file_uploader("选择keyword文件", accept_multiple_files=True)
-        if uploaded_files:
+        is_file = uploaded_files is not None
+
+        if is_file:
             server_resp, data, local_resp = upload(uploaded_files, KEYWORD_FILE)
             # # 显示上传成功的文件
-            st.write("服务器端文件上传成功：", set(server_resp))
-            st.write("本地保存的文件路径：", set(local_resp))
-            try:
-                assert len(selected_prompts) == len(data)
-                # 将数据填入对应的prompt中的{$keyword}
-            except Exception as e:
-                st.warning(f'选择的prompt数量和keyword数量对不上\n {selected_prompts} | {data}')
-
+            # st.write("服务器端文件上传成功：", set(server_resp))
+            # st.write("本地保存的文件路径：", set(local_resp))
             final_prompt_lst = get_final_prompt(selected_prompts, data)
             st.session_state['final_prompt_lst'] = final_prompt_lst
-            st.write(final_prompt_lst)
+            final_prompt_df = pd.DataFrame({
+                'query_prompt': final_prompt_lst[0]['query_prompt'],
+                'answer_prompt': final_prompt_lst[0]['answer_prompt'],
+                'evaluate_prompt': final_prompt_lst[0]['evaluate_prompt'],
+                })
+            if 'final_prompt_df' not in st.session_state:
+                st.session_state['final_prompt_df'] = final_prompt_df
+            st.dataframe(final_prompt_df, height=400, width=800)
+        
+        # if st.button('开始构造数据'):
+        #     test_query()
     else:
         st.warning('请先输入是什么类型的prompt')

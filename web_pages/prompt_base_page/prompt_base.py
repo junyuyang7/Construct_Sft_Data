@@ -49,8 +49,8 @@ def config_aggrid(
 
 def prompt_base_page():
     # 按照格式上传prompt模板 
-    def upload_prompt(tabel_name, domain_name, task_name, cls_name, model_type, prompt, args):
-        response = requests.post(PROMPT_UPLOAD, json={'tabel_name': tabel_name, 'domain_name': domain_name, 'task_name': task_name, 'cls_name': cls_name, 'prompt': prompt, 'args': args, 'prompt_id': None, 'keyword': None})
+    def upload_prompt(tabel_name, domain_name, task_name, cls_name, args=None, query_args=None, answer_args=None, evaluate_args=None, query_prompt=None, answer_prompt=None, evaluate_prompt=None, prompt=None):
+        response = requests.post(PROMPT_UPLOAD, json={'tabel_name': tabel_name, 'domain_name': domain_name, 'task_name': task_name, 'cls_name': cls_name, 'prompt': prompt, 'args': args, 'query_prompt': query_prompt, 'query_args': query_args, 'answer_prompt': answer_prompt, 'answer_args': answer_args, 'evaluate_prompt': evaluate_prompt, 'evaluate_args': evaluate_args, 'prompt_id': None, 'keyword': None})
         if response.status_code == 200:
             st.success("Prompt upload successfully!")
             return response.json().get('status', False), response.json().get('prompt_data', {})
@@ -59,7 +59,7 @@ def prompt_base_page():
             return False, []
 
     def list_all_prompt(tabel_name):
-        response = requests.post(PROMPT_LIST, json={'tabel_name': tabel_name})
+        response = requests.post(PROMPT_LIST, json={'tabel_name': tabel_name, 'prompt_id': None})
         if response.status_code == 200:
             st.success("Prompt list successfully!")
             return response.json().get('data', {})
@@ -68,7 +68,7 @@ def prompt_base_page():
             return {}
 
     def delete_prompt(tabel_name, prompt_id):
-        response = requests.post(PROMPT_DELETE, json={'tabel_name': tabel_name, 'domain_name': None, 'task_name': None, 'cls_name': None, 'prompt': None, 'args': None,'keyword': None, 'prompt_id': prompt_id})
+        response = requests.post(PROMPT_DELETE, json={'tabel_name': tabel_name, 'prompt_id': prompt_id})
         if response.status_code == 200:
             st.success("Prompt delete successfully!")
             return response.json().get('status', False)
@@ -85,8 +85,8 @@ def prompt_base_page():
             st.error("Failed to find the prompt.")
             return False, {}
 
-    def update_prompt(tabel_name, prompt_id, domain_name, task_name, cls_name, prompt, args):
-        response = requests.post(PROMPT_UPDATE, json={'tabel_name': tabel_name, 'domain_name': domain_name, 'task_name': task_name, 'cls_name': cls_name, 'prompt': prompt, 'args': args, 'keyword': None, 'prompt_id': prompt_id})
+    def update_prompt(tabel_name, prompt_id, domain_name, task_name, cls_name, args=None, query_args=None, answer_args=None, evaluate_args=None, query_prompt=None, answer_prompt=None, evaluate_prompt=None, prompt=None):
+        response = requests.post(PROMPT_UPDATE, json={'tabel_name': tabel_name, 'domain_name': domain_name, 'task_name': task_name, 'cls_name': cls_name, 'prompt': prompt, 'args': args, 'query_prompt': query_prompt, 'query_args': query_args, 'answer_prompt': answer_prompt, 'answer_args': answer_args, 'evaluate_prompt': evaluate_prompt, 'evaluate_args': evaluate_args, 'keyword': None, 'prompt_id': prompt_id})
         if response.status_code == 200:
             st.success("Prompt update successfully!")
             return response.json().get('status', False), response.json().get('prompt_data', {})
@@ -117,6 +117,7 @@ def prompt_base_page():
     
     def check_prompt_args(args_prompt, args):
         try:
+            args = args.split(';')[0]
             assert args.split() == args_prompt
             return True
         except Exception as e:
@@ -124,14 +125,19 @@ def prompt_base_page():
             return False
 
     import re
-    def get_prompt_keyword(text):
-        # 使用正则表达式提取 {$...} 格式的占位符
+    def get_prompt_keyword_input(text):
+        # 使用正则表达式提取 {$...} 格式的占位符，可以直接进行填充的参数
         pattern = r'\{\$(\w+)\}'
+        matches = re.findall(pattern, text)
+        return matches
+    
+    def get_prompt_keyword_iter(text):
+        # 使用正则表达式提取 {$$...} 格式的占位符，在构造的过程中才能进行填充
+        pattern = r'\{\$\$(\w+)\}'
         matches = re.findall(pattern, text)
         return matches
 
     with st.sidebar:
-        # button 
         executor = [
             '上传prompt',
             '修改prompt',
@@ -144,13 +150,12 @@ def prompt_base_page():
                                 on_change=on_mode_change,
                                 key="mode"
                             )
-    # domain_name, task_name, cls_name, model_type, prompt
-    if mode == '上传prompt':
+    if mode == '上传prompt' or mode == '修改prompt':
         tabel_name = st.text_input(
-            "是什么类型的prompt [query_prompt, answer_prompt, evaluate_prompt]",
+            "是什么类型的prompt [query_prompt, answer_prompt, evaluate_prompt, all_prompt]",
             key="tabel_name",
         )
-        if tabel_name in ['query_prompt', 'answer_prompt', 'evaluate_prompt']:
+        if tabel_name in ['query_prompt', 'answer_prompt', 'evaluate_prompt', 'all_prompt']:
             domain_name = st.text_input(
                 "prompt所属知识领域",
                 key="domain_name",
@@ -163,87 +168,70 @@ def prompt_base_page():
                 "prompt所属任务类别细分",
                 key="cls_name",
             )
-            prompt = st.text_input(
-                "prompt",
-                key="prompt",
-            )
-            args = st.text_input(
-                "prompt中含有的参数，请用空格分开",
-                key="args",
-            )
+            if mode == '修改prompt':
+                data = list_all_prompt(tabel_name, )
+                data = pd.DataFrame(data)
+                st.dataframe(data, width=800, height=400)
+                st.subheader('如果需要修改数据，请填写以下信息。')
+            if tabel_name == 'all_prompt':
+                query_prompt = st.text_input("query_prompt", key="query_prompt",)
+                answer_prompt = st.text_input("answer_prompt", key="answer_prompt",)
+                evaluate_prompt = st.text_input("evaluate_prompt", key="evaluate_prompt",)
+                query_args = st.text_input("query_prompt 中含有的参数，请用空格分开同种类型的，用;(英文)分开不同类型的", key="query_args",)
+                answer_args = st.text_input("answer_prompt 中含有的参数，请用空格分开同种类型的，用;(英文)分开不同类型的", key="answer_args",)
+                evaluate_args = st.text_input("evaluate_prompt 中含有的参数，请用空格分开同种类型的，用;(英文)分开不同类型的", key="evaluate_args",)
+            else:
+                prompt = st.text_input("prompt", key="prompt",)
+                args = st.text_input("prompt中含有的参数，请用空格分开同种类型的，用;(英文)分开不同类型的", key="args",)
+
             if st.button("上传prompt"):
-                # 确保args和prompt中的对应  
-                args_prompt = get_prompt_keyword(prompt)
-                if_same = check_prompt_args(args_prompt, args)
+                # 确保args和prompt中的对应 
+                if tabel_name == 'all_prompt':
+                    query_args_input = get_prompt_keyword_input(query_prompt)
+                    answer_args_input = get_prompt_keyword_input(answer_prompt)
+                    evaluate_args_input = get_prompt_keyword_input(evaluate_prompt)
+                    if_same1, if_same2, if_same3 = check_prompt_args(query_args_input, query_args), check_prompt_args(answer_args_input, answer_args), check_prompt_args(evaluate_args_input, evaluate_args)
+                    if_same = if_same1 and if_same2 and if_same3
+                else:
+                    args_input = get_prompt_keyword_input(prompt)
+                    if_same = check_prompt_args(args_input, args)
                 if if_same:
-                    status, resp = upload_prompt(tabel_name, domain_name, task_name, cls_name, prompt, args)
+                    if tabel_name == 'all_prompt':
+                        status, resp = upload_prompt(
+                            tabel_name=tabel_name, 
+                            domain_name=domain_name, 
+                            task_name=task_name, 
+                            cls_name=cls_name,  
+                            query_args=query_args, 
+                            answer_args=answer_args, 
+                            evaluate_args=evaluate_args, 
+                            query_prompt=query_prompt, 
+                            answer_prompt=answer_prompt, 
+                            evaluate_prompt=evaluate_prompt,)
+                    else:
+                        status, resp = upload_prompt(
+                            tabel_name=tabel_name, 
+                            domain_name=domain_name, 
+                            task_name=task_name, 
+                            cls_name=cls_name, 
+                            prompt=prompt, 
+                            args=args)
                     if status:
                         st.write("上传成功", resp)
-        else:
-            st.warning('请先输入是什么类型的prompt')
-
-    elif mode == "修改prompt":
-        tabel_name = st.text_input(
-            "是什么类型的prompt [query_prompt, answer_prompt, evaluate_prompt]",
-            key="tabel_name",
-        )
-        if tabel_name in ['query_prompt', 'answer_prompt', 'evaluate_prompt']:
-            data = list_all_prompt(tabel_name, )
-            data = pd.DataFrame(data)
-            # st.dataframe(data)
-            edited_df = show_editable_grid(data)
-
-            # if not edited_df.equals(data):
-            #     # update_db_from_dataframe(edited_df)
-            #     st.success("Database updated successfully!")
-
-            # st.dataframe(edited_df)
-            st.subheader('如果需要修改数据，请填写以下信息。')
-            prompt_id = st.text_input(
-                "prompt id",
-                key="prompt_id",
-            )
-            domain_name = st.text_input(
-                "prompt所属知识领域",
-                key="domain_name",
-            )
-            task_name = st.text_input(
-                "prompt所属任务类别",
-                key="task_name",
-            )
-            cls_name = st.text_input(
-                "prompt所属任务类别细分",
-                key="cls_name",
-            )
-            prompt = st.text_input(
-                "prompt具体内容",
-                key="prompt",
-            )
-            args = st.text_input(
-                "prompt中含有的参数，请用空格分开",
-                key="args",
-            )
-            if st.button("修改prompt"):
-                # 确保args和prompt中的对应  
-                args_prompt = get_prompt_keyword(prompt)
-                if_same = check_prompt_args(args_prompt, args)
-                if if_same:
-                    status, resp = update_prompt(tabel_name, prompt_id, domain_name, task_name, cls_name, prompt, args)
-                    if status:
-                        st.write("修改成功", resp)
+                else:
+                    st.warning('你args这一栏写错了')
         else:
             st.warning('请先输入是什么类型的prompt')
 
     elif mode == "删除prompt":
         tabel_name = st.text_input(
-            "是什么类型的prompt [query_prompt, answer_prompt, evaluate_prompt]",
+            "是什么类型的prompt [query_prompt, answer_prompt, evaluate_prompt, all_prompt]",
             key="tabel_name",
         )
-        if tabel_name in ['query_prompt', 'answer_prompt', 'evaluate_prompt']:
+        if tabel_name in ['query_prompt', 'answer_prompt', 'evaluate_prompt', 'all_prompt']:
             data = list_all_prompt(tabel_name, )
             data = pd.DataFrame(data)
-            # st.dataframe(data)
-            edited_df = show_editable_grid(data)
+            st.dataframe(data, width=800, height=400)
             st.subheader('请输入你要删除的数据的prompt_id')
             prompt_id = st.text_input(
                 "prompt id",
@@ -257,13 +245,13 @@ def prompt_base_page():
             st.warning('请先输入是什么类型的prompt')
     elif mode == "查找prompt":
         tabel_name = st.text_input(
-            "是什么类型的prompt [query_prompt, answer_prompt, evaluate_prompt]",
+            "是什么类型的prompt [query_prompt, answer_prompt, evaluate_prompt, all_prompt]",
             key="tabel_name",
         )
-        if tabel_name in ['query_prompt', 'answer_prompt', 'evaluate_prompt']:
+        if tabel_name in ['query_prompt', 'answer_prompt', 'evaluate_prompt', 'all_prompt']:
             data = list_all_prompt(tabel_name, )
             data = pd.DataFrame(data)
-            # st.dataframe(data)
+            st.dataframe(data, width=800, height=400)
             edited_df = show_editable_grid(data)
             st.subheader('请输入你要找的关键词')
             keyword = st.text_input(

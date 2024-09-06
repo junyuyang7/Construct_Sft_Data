@@ -23,7 +23,7 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 
 from construct_query import test_query
-from construct_answer import test_answer
+from filter_data import filter_data_page
 from data_evaluate import test_evaluate
 from prompt_choose import test_prompt
 
@@ -35,36 +35,38 @@ UPLOAD_DIRECTORY = "test"
 def construct_page():
     def on_mode_change():
         mode = st.session_state.mode
-        text = f"请 {mode} "
+        text = f"请进行 {mode} "
         st.toast(text)
 
     st.title("Construct Data page")
-    st.text('选择你要进行的步骤')
+    # st.text('选择你要进行的步骤')
+    if 'tabel_name' not in st.session_state:
+        st.session_state['tabel_name'] = 'query_prompt'
 
     pages = {
         "prompt选择": {
             "icon": "chat",
             "func": test_prompt,
         },
-        "query构造": {
+        "SFT数据构造": {
             "icon": "hdd-stack",
             "func": test_query,
         },
-        "answer构造": {
-            "icon": "hdd-stack",
-            "func": test_answer,
-        },
-        "数据评估": {
-            "icon": "hdd-stack",
-            "func": test_evaluate,
-        },
+        # "SFT数据筛选": {
+        #     "icon": "hdd-stack",
+        #     "func": filter_data_page,
+        # },
+        # "数据评估": {
+        #     "icon": "hdd-stack",
+        #     "func": test_evaluate,
+        # },
     }
     with st.sidebar:
         executor = [
             'prompt选择',
-            'query构造',
-            'answer构造',
-            '数据评估',
+            'SFT数据构造',
+            # 'SFT数据筛选',
+            # '数据评估',
         ]
         mode = st.selectbox("请选择构造的步骤：", executor, index=0, on_change=on_mode_change, key="mode")
 
