@@ -1,14 +1,18 @@
 import os
 from dataclasses import dataclass
 import time
+os.environ['CUDA_VISIBLE_DEVICES'] = '2,3,4,5'
 
 llm_model_dict = {
-    'chatglm2-6b': "/home/yangjy/Study/ChatAgent_RAG/llm_models/chatglm3-6b/"
+    'chatglm3-6b': "/home/yangjy/Study/ChatAgent_RAG/llm_models/chatglm3-6b/",
+    'llama-2-7b-chat': "/home/yangjy/Study/ChatAgent_RAG/llm_models/Llama-2-7b-chat/",
+    "llama-2-13b-chat": "/home/yangjy/Study/ChatAgent_RAG/llm_models/Llama-2-13b-chat/",
+    "llama-3-8b-instruct": "/home/yangjy/Study/ChatAgent_RAG/llm_models/Meta-Llama-3.1-8B-Instruct/",
 }
 
 @dataclass
 class Args:
-    model_path: str = llm_model_dict['chatglm2-6b']
+    model_path: str = llm_model_dict['chatglm3-6b']
     temperature: float = 1.0
     top_p: float = 1.0
     n: int = 1
@@ -28,7 +32,7 @@ class Args:
     engine: str = "vllm"
     device: str = "1"
     dtype: str = "bfloat16"
-    tensor_parallel_size: int = 1
+    tensor_parallel_size: int = 2
     gpu_memory_utilization: float = 0.95
     swap_space: float = 2.0
     output_folder: str = "../test_data"

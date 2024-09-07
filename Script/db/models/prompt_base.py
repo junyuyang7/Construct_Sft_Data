@@ -22,7 +22,7 @@ class AllPrompt(BaseModel):
     evaluate_args = Column(String, default=None, comment="evaluate_prompt中的参数")
 
 class FirstQueryPrompt(BaseModel):
-    __tablename__ = 'query_prompt'  # 定义数据库表的名称
+    __tablename__ = 'first_query_prompt'  # 定义数据库表的名称
 
     id = Column(Integer, ForeignKey('base_model.id'), primary_key=True)
     domain_name = Column(String, default=None, comment="领域名字")

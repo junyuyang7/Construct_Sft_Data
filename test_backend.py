@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, Request
 from pydantic import BaseModel
 import uvicorn
 from typing import *
@@ -6,9 +6,16 @@ import os
 # from Script.create_db import DBconnecter
 from Script.data_base.kb_service import DBService
 import json
+import torch
 from transformers import AutoConfig, AutoModel, AutoTokenizer, LlamaForCausalLM
+
+from Script.model_workers.base import LLMModelBase
+from Script.config import Args, llm_model_dict
+from web_pages.utils import construct_dialog
 # from utils import xuanji_api
 
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2,3,4,5'
 UPLOAD_DIRECTORY = "./uploaded_files"
 os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
 
@@ -17,10 +24,12 @@ app = FastAPI()
 def xuanji_api(prompt, model, intention):
     return "this is resp"
 
+class ModelRequest(BaseModel):
+    model_name: str
+
 class Message(BaseModel):
     text: str
-    model_name: str
-    message: list
+    message: Union[List[dict], None]
 
 class Basefile(BaseModel):
     file_names: List[str]
@@ -61,48 +70,45 @@ class SFTDataBase(BaseModel):
     score: Union[int, None]
     history: Union[str, None]
 
-model = None
-tokenizer = None
+llm_model = None
 
-# @app.post("/load_model/")
-# async def load_model():
-#     global model, tokenizer
-#     if model is None and tokenizer is None:
-#         config = AutoConfig.from_pretrained('LLM_model/Llama-2-7b-hf')
-#         tokenizer = AutoTokenizer.from_pretrained('LLM_model/Llama-2-7b-hf')
-#         model = LlamaForCausalLM.from_pretrained('LLM_model/Llama-2-7b-hf')
-#         return {"status": "Model loaded successfully"}
-#     else:
-#         return {"status": "Model is already loaded"}
+def load_model(model_name):
+    global llm_model
+    
+    if llm_model is not None:
+        # 释放原有模型的显存
+        del llm_model
+        torch.cuda.empty_cache()
+        
+    args = Args()
+    args.model_path = llm_model_dict[model_name]
+    llm_model = LLMModelBase(args)
+    
+    return f"Loaded {model_name} successfully"
 
-# @app.post("/chat/")
-# async def chat(message: Message):
-#     # 这里可以替换成更复杂的对话逻辑
-#     # config = AutoConfig.from_pretrained('LLM_model/Llama-2-7b-hf')
-#     # tokenizer = AutoTokenizer.from_pretrained('LLM_model/Llama-2-7b-hf')
-#     # model = LlamaForCausalLM.from_pretrained('LLM_model/Llama-2-7b-hf')
+@app.post("/switch_model/")
+async def switch_model(request: Request):
+    data = await request.json()  # 解析请求体中的 JSON 数据
+    model_name = data.get("model_name")  # 获取 model_name 字段
+    if not model_name:
+        return {"error": "Model name not provided"}
     
-#     text = f"{message.text}"
-#     inputs = tokenizer(text, return_tensors="pt")
-    
-#     generate_ids = model.generate(inputs.input_ids, max_length=200)
-#     outputs = tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-    
-#     return {"response": outputs}
+    result = load_model(model_name)
+    return {"status": result}
 
+@app.get("/current_model/")
+async def current_model(request: Request):
+    data = await request.json()  # 解析请求体中的 JSON 数据
+    model_name = data.get("model_name")  # 获取 model_name 字段
+    if not model_name:
+        return {"error": "Model name not provided"}
+    return {"current_model": model_name}
 
 @app.post("/chat/")
 async def chat(message: Message):
-    
-    text = f"{message.text}"
-    # inputs = tokenizer(text, return_tensors="pt")
-    print(message.message)
-    resp = xuanji_api(prompt=text, model=message.model_name, intention=True)
-    
-    # generate_ids = model.generate(inputs.input_ids, max_length=200)
-    # outputs = tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-    
-    return {"response": resp}
+    resp, chat_lst = llm_model.generate(prompt=message.text, chat_lst=message.message)
+        
+    return {"response": resp, 'chat_lst': chat_lst}
 
 # Construct Data API
 @app.post("/upload/")
@@ -119,6 +125,18 @@ async def upload(files: List[UploadFile]):
         all_json_data.append(json_data)
 
     return {"filenames": results, "json_data": all_json_data}
+
+@app.post("/construct_dialog")
+async def construct_sft_data(request: Request):
+    data = await request.json()  # 解析请求体中的 JSON 数据
+    final_prompt_lst = data.get("final_prompt_lst")
+    model_name = data.get("model_name")
+    
+    if not model_name or final_prompt_lst:
+        return {"error": "Model name not provided"}
+    ans_df_lst, filter_prompt_lst = construct_dialog(final_prompt_lst, model_name)
+    
+    return {'ans_df_lst': ans_df_lst, 'filter_prompt_lst': filter_prompt_lst}
 
 # Prompt_Base API
 @app.post('/prompt_upload/')

@@ -9,11 +9,16 @@ import numpy as np
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from vllm import LLM, SamplingParams
-from Script.config import Args
 # from accelerate import init_empty_weights, infer_auto_device_map
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-os.environ['CUDA_VISIBLE_DEVICES'] = '2,3,4,5,6,7'
+# sys.path.append(os.path.dirname(__file__))
+
+from Script.config import Args
+
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,3,4,5'
 
 class LLMModelBase:
     def __init__(self, args: Args) -> None:
@@ -27,7 +32,7 @@ class LLMModelBase:
                 trust_remote_code=True,
                 tokenizer=self.args.model_path,
                 tokenizer_mode='slow',
-                tensor_parallel_size=1
+                tensor_parallel_size=self.args.tensor_parallel_size
             )
             
             def de_md_logits_processor_for_llama3_1(token_ids, logits):
@@ -78,70 +83,31 @@ class LLMModelBase:
                 torch_dtype=torch.bfloat16 if self.args.dtype == "bfloat16" else torch.float16
             )
 
-    def get_model(self):
-        if self.args.engine == "vllm":
-            # Create vllm instance  
-            llm = LLM(
-                model=self.args.model_path,
-                trust_remote_code=True,
-                tokenizer=self.args.model_path,
-                tokenizer_mode='slow',
-                tensor_parallel_size=1
-            )
-            
-            def de_md_logits_processor_for_llama3_1(token_ids, logits):
-                # Only process the initial logits
-                if len(token_ids) == 0:
-                    logits[2] = -9999.999 # "#": 2,
-                    logits[567] = -9999.999 # "##": 567,
-                    logits[14711] = -9999.999 # "###": 14711,
-                    logits[827] = -9999.999 # "####": 827,
-
-                return logits
-
-            if self.args.logits_processor and "llama-3.1" in self.args.model_path.lower():
-                logits_processor = de_md_logits_processor_for_llama3_1
-                print(f"Logits processor applied: {logits_processor}")
-            else:
-                logits_processor = None
-                
-            # Define sampling parameters
-            sampling_params = SamplingParams(
-                # n=self.args.n,
-                temperature=self.args.temperature,
-                top_p=self.args.top_p,
-                max_tokens=self.args.max_tokens,
-                skip_special_tokens=self.args.skip_special_tokens,
-                logits_processors=[logits_processor] if logits_processor else None
-            )
-            
-            return llm, sampling_params
+    def generate(self, prompt, chat_lst):
+        '''chat_lst = [{}, {}, {}]'''
+        chat_lst.append({'role': 'user', 'content': prompt})
+        template = self.tokenizer.apply_chat_template(chat_lst, tokenize=False, add_generation_prompt=True)
         
+        if self.args.engine == "vllm":
+            output = self.llm.generate(template, self.sampling_params)
+            output = output[0].outputs[0].text
+            
         elif self.args.engine == "hf":
-            # Load the model and tokenizer
-            tokenizer = AutoTokenizer.from_pretrained(self.args.model_path)
-            
-            # # 初始化多卡推理的设备映射
-            # with init_empty_weights():
-            #     model = AutoModelForCausalLM.from_pretrained(
-            #         self.args.model_path,
-            #         torch_dtype=torch.bfloat16 if self.args.dtype == "bfloat16" else torch.float16
-            #     )
-
-            # # 使用 accelerate 自动推理设备映射
-            # device_map = infer_auto_device_map(
-            #     model,
-            #     max_memory={i: '20GB' for i in range(4)},  # 根据实际 GPU 内存进行配置
-            #     no_split_module_classes=["LlamaDecoderLayer"],  # 根据模型结构进行模块划分
-            # )
-            
-            # 加载模型到多 GPU 上
-            model = AutoModelForCausalLM.from_pretrained(
-                self.args.model_path,
-                device_map={0: 'cuda:1'},
-                torch_dtype=torch.bfloat16 if self.args.dtype == "bfloat16" else torch.float16
-            )
-            return model, tokenizer
+            inputs = self.tokenizer(template, return_tensors="pt", padding=True, truncation=True).to('cuda: 1')
+            output = self.model.generate(**inputs,
+                                    tokenizer=self.tokenizer, 
+                                    do_sample=True, 
+                                    temperature=self.args.temperature, 
+                                    top_p=self.args.top_p, 
+                                    max_length=self.args.max_tokens, 
+                                    num_return_sequences=1,
+                                    )
+            # Remove the input from the output
+            output = self.tokenizer.decode(output[len(inputs[0]):])
+        
+        chat_lst.append({'role': 'assistant', 'content': output})    
+        
+        return output, chat_lst
      
     def generate_mask(self, input_lst, mask_lst):
         # 记录 value=1 的 index 位置
@@ -300,7 +266,7 @@ if __name__ == '__main__':
             trust_remote_code=True,
             tokenizer=model_path,
             tokenizer_mode='slow',
-            tensor_parallel_size=1
+            tensor_parallel_size=2
         )
         outputs = llm.generate(prompts, sampling_params)
         # Print the outputs.

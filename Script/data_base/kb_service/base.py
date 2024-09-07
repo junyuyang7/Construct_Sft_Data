@@ -142,21 +142,29 @@ class DBService(ABC):
         args_json, query_json, answer_json, evaluate_json = None, None, None, None
 
         if self.tabel_name == 'all_prompt':
-            query_args, answer_args, evaluate_args = query_args.split(';'), answer_args.split(';'), evaluate_args.split(';')
+            try:
+                query_json, answer_json, evaluate_json = query_args.split(';'), answer_args.split(';'), evaluate_args.split(';')
 
-            query_json = {'input_args': query_args[0].split(),
-                        'iter_args': query_args[1].split()}
-            answer_json = {'input_args': answer_args[0].split(),
-                        'iter_args': answer_args[1].split()}
-            evaluate_json = {'input_args': evaluate_args[0].split(),
-                        'iter_args': evaluate_args[1].split()}
+                query_json = {'input_args': query_json[0].split(),
+                            'iter_args': query_json[1].split()}
+                answer_json = {'input_args': answer_json[0].split(),
+                            'iter_args': answer_json[1].split()}
+                evaluate_json = {'input_args': evaluate_json[0].split(),
+                            'iter_args': evaluate_json[1].split()}
+            except:
+                query_json = {'input_args': query_args.split()}
+                answer_json = {'input_args': answer_args.split()}
+                evaluate_json = {'input_args': evaluate_args.split()}
             
             query_json, answer_json, evaluate_json = json.dumps(query_json), json.dumps(answer_json), json.dumps(evaluate_json)
 
         else:
-            args = args.split(';')
-            args_json = {'input_args': args_json[0].split(),
+            try:
+                args_json = args.split(';')
+                args_json = {'input_args': args_json[0].split(),
                      'iter_args': args_json[1].split()}
+            except:
+                args_json = {'input_args': args.split()}
             args_json = json.dumps(args_json)
 
         # 检查是否存在重复记录（排除id）
@@ -194,6 +202,10 @@ if __name__ == '__main__':
     # status = db.insert_data('test', 'test', 'test', 'test', 'test')
     # print(status)
     db = DBService(tabel_name='query_prompt')
+    status = db.recreate_table()
+    status = db.insert_data('test', 'test', 'test', 'test', 'test', 'test', 'test', 'test','test', 'test', 'test', 'test', 'test')
+    print(status)
+    db = DBService(tabel_name='first_query_prompt')
     status = db.recreate_table()
     status = db.insert_data('test', 'test', 'test', 'test', 'test', 'test', 'test', 'test','test', 'test', 'test', 'test', 'test')
     print(status)
