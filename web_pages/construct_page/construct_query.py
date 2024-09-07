@@ -41,15 +41,16 @@ def test_query():
 
     try:
         final_prompt_lst = st.session_state['final_prompt_lst']
-        final_prompt_df = st.session_state['final_prompt_df']
+        final_prompt_df_lst = st.session_state['final_prompt_df_lst']
+        assert len(final_prompt_df_lst) == len(final_prompt_lst), "final_prompt_df_lst 和 final_prompt_lst 不一样长"
+        len_prompt_lst = len(final_prompt_df_lst)
     except:
         st.warning('你需要先选好Prompt')
+        
     # 将所有的prompt数据调用LLM 接口进行批量构造数据并返回xlsx文件
     with st.sidebar:
         # Button to load the model
         global model_name
-        
-        chat_input_placeholder = "请输入对话内容，换行请使用Shift+Enter。输入/help查看自定义命令 "
         model_list = ['vivo-BlueLM-HB-PRE', 'vivo-BlueLM-TB-Pro-TEST', 'Doubao-pro-32k']
         model_name = st.selectbox("请选择模型：",
                                 model_list,
@@ -66,19 +67,20 @@ def test_query():
     turn = random.randint(turn_range[0], turn_range[1])
     st.write("<h2 style='text-align: center; font-size: 16px; color: gray;'>以下是待进行数据构建的prompt</h2>", unsafe_allow_html=True)
 
-    turn_lst = [random.randint(turn_range[0], turn_range[1]) for _ in range(len(final_prompt_df))]
-    final_prompt_df['turn'] = turn_lst
-    final_prompt_lst[0]['turn'] = turn_lst
+    for i in range(len_prompt_lst):
+        turn_lst = [random.randint(turn_range[0], turn_range[1]) for _ in range(len(final_prompt_df_lst[i]))]
+        final_prompt_df_lst[i]['turn'] = turn_lst
+        final_prompt_lst[i]['turn'] = turn_lst
+        final_prompt_lst[i]['chat'] = []  # 这个字段用来储存对话数据
+        with st.expander(f"这是{final_prompt_lst[i]['domain_name']}的构造数据集"):
+            st.dataframe(final_prompt_df_lst[i], height=300, width=800)
+    
+    
     st.session_state['final_prompt_lst'] = final_prompt_lst
-    st.dataframe(final_prompt_df, height=400, width=800)
-    # prompt_lst = final_prompt_lst[0]['prompt']
-    # turn_lst = [random.randint(turn_range[0], turn_range[1]) for _ in range(len(prompt_lst))]
-    # prompt_df = pd.DataFrame({'prompt': prompt_lst, 'turn': turn_lst})
-    # st.dataframe(prompt_df, width=800, height=300)
 
     if st.button("开始构造数据"):
         # 进行批量构造数据并返回xlsx文件(保存至数据库中)，以json的格式
-        ans_df_lst = construct_dialog(final_prompt_lst, model_name)
+        ans_df_lst, filter_prompt_lst = construct_dialog(final_prompt_lst, model_name)
         for i, ans_df in enumerate(ans_df_lst):
-            with st.expander(f"这是{final_prompt_lst[0]['domain_name']}的构造数据集"):
+            with st.expander(f"这是{final_prompt_lst[i]['domain_name']}的构造数据集"):
                 st.dataframe(ans_df, width=800, height=300)

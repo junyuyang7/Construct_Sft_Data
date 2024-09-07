@@ -15,23 +15,21 @@ from pprint import pprint
 from Script.config import HTTPX_DEFAULT_TIMEOUT, logger, log_verbose
 from Script.DataConstructer import DataConstructer
 from Script.model_workers.base import LLMModelBase
+from Script.config import Args, llm_model_dict
 
 set_httpx_config()
 
 def xuan_ji(sample, model_name):
     return 'this is resp'
 
-def construct_dialog(final_prompt_lst, model_name):
-    data_df_lst = []
-    
-    for final_prompt in final_prompt_lst:
-        args = load_config(CONFIG_FILE)
-        llm_model = LLMModelBase(args)
-        data_construct = DataConstructer(llm_model=llm_model)
-        data_df = data_construct.construct_dialogs(final_prompt_lst, model_name)
-        data_df_lst.append(data_df)
+def construct_dialog(final_prompt_lst, model_name, llm_model):
+    args = Args()
+    args.model_path = llm_model_dict[model_name]
+    llm_model = LLMModelBase(args)
+    data_construct = DataConstructer(llm_model=llm_model)
+    final_df_lst, filter_prompt_lst = data_construct.construct_dialogs(final_prompt_lst)
 
-    return data_df_lst
+    return final_df_lst, filter_prompt_lst
 
 class ApiRequest:
     '''

@@ -1,4 +1,4 @@
-from Script.db.models.prompt_base import AnswerPrompt, EvaluatePrompt, QueryPrompt, AllPrompt
+from Script.db.models.prompt_base import AnswerPrompt, EvaluatePrompt, QueryPrompt, AllPrompt, FirstQueryPrompt
 from Script.db.session import with_session
 from typing import List
 import pandas as pd
@@ -7,6 +7,7 @@ ModelType = {
     'answer_prompt': AnswerPrompt,
     'evaluate_prompt': EvaluatePrompt,
     'query_prompt': QueryPrompt,
+    'first_query_prompt': FirstQueryPrompt,
     'all_prompt': AllPrompt,
 }
 
@@ -16,7 +17,7 @@ class PromptAction:
         self.PromptModel = ModelType[prompt_type]
     
     @with_session
-    def add_prompt_to_db(session, self, domain_name, task_name, cls_name, args, query_args, answer_args, evaluate_args, query_prompt=None, answer_prompt=None, evaluate_prompt=None, prompt=None):
+    def add_prompt_to_db(session, self, domain_name, task_name, cls_name, args, first_query_args, query_args, answer_args, evaluate_args, first_query_prompt=None, query_prompt=None, answer_prompt=None, evaluate_prompt=None, prompt=None):
         '''创建/更新知识库实例加入数据库'''
         # 构造查询条件
         filters = [
@@ -27,9 +28,11 @@ class PromptAction:
 
         if self.prompt_type == 'all_prompt':
             filters.extend([
+                self.PromptModel.first_query_prompt == first_query_prompt,
                 self.PromptModel.query_prompt == query_prompt,
                 self.PromptModel.answer_prompt == answer_prompt,
                 self.PromptModel.evaluate_prompt == evaluate_prompt,
+                self.PromptModel.first_query_args == first_query_args,
                 self.PromptModel.query_args == query_args,
                 self.PromptModel.answer_args == answer_args,
                 self.PromptModel.evaluate_args == evaluate_args
@@ -50,9 +53,11 @@ class PromptAction:
                     domain_name=domain_name,
                     task_name=task_name,
                     cls_name=cls_name,
+                    first_query_prompt=first_query_prompt,
                     query_prompt=query_prompt,
                     answer_prompt=answer_prompt,
                     evaluate_prompt=evaluate_prompt,
+                    first_query_args=first_query_args,
                     query_args=query_args,
                     answer_args=answer_args,
                     evaluate_args=evaluate_args,
@@ -72,9 +77,11 @@ class PromptAction:
             existing_prompt.task_name = task_name
             existing_prompt.cls_name = cls_name
             if self.prompt_type == 'all_prompt':
+                existing_prompt.first_query_prompt = first_query_prompt
                 existing_prompt.query_prompt = query_prompt
                 existing_prompt.answer_prompt = answer_prompt
                 existing_prompt.evaluate_prompt = evaluate_prompt
+                existing_prompt.first_query_args = first_query_args
                 existing_prompt.query_args = query_args
                 existing_prompt.answer_args = answer_args
                 existing_prompt.evaluate_args = evaluate_args

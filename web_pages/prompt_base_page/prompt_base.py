@@ -49,8 +49,24 @@ def config_aggrid(
 
 def prompt_base_page():
     # 按照格式上传prompt模板 
-    def upload_prompt(tabel_name, domain_name, task_name, cls_name, args=None, query_args=None, answer_args=None, evaluate_args=None, query_prompt=None, answer_prompt=None, evaluate_prompt=None, prompt=None):
-        response = requests.post(PROMPT_UPLOAD, json={'tabel_name': tabel_name, 'domain_name': domain_name, 'task_name': task_name, 'cls_name': cls_name, 'prompt': prompt, 'args': args, 'query_prompt': query_prompt, 'query_args': query_args, 'answer_prompt': answer_prompt, 'answer_args': answer_args, 'evaluate_prompt': evaluate_prompt, 'evaluate_args': evaluate_args, 'prompt_id': None, 'keyword': None})
+    def upload_prompt(tabel_name, domain_name, task_name, cls_name, args=None, first_query_args=None, query_args=None, answer_args=None, evaluate_args=None, first_query_prompt=None, query_prompt=None, answer_prompt=None, evaluate_prompt=None, prompt=None):
+        response = requests.post(PROMPT_UPLOAD, json={
+            'tabel_name': tabel_name, 
+            'domain_name': domain_name, 
+            'task_name': task_name, 
+            'cls_name': cls_name, 
+            'prompt': prompt, 
+            'args': args, 
+            'first_query_prompt': first_query_prompt, 
+            'query_prompt': query_prompt, 
+            'first_query_args': first_query_args, 
+            'query_args': query_args, 
+            'answer_prompt': answer_prompt, 
+            'answer_args': answer_args, 
+            'evaluate_prompt': evaluate_prompt, 
+            'evaluate_args': evaluate_args, 
+            'prompt_id': None, 
+            'keyword': None})
         if response.status_code == 200:
             st.success("Prompt upload successfully!")
             return response.json().get('status', False), response.json().get('prompt_data', {})
@@ -76,6 +92,7 @@ def prompt_base_page():
             st.error("Failed to delete the prompt.")
             return False
 
+    # TODO
     def find_prompt(tabel_name, keyword):
         response = requests.post(PROMPT_SEARCH, json={'tabel_name': tabel_name, 'domain_name': None, 'task_name': None, 'cls_name': None, 'prompt': None, 'args': None, 'keyword': keyword, 'prompt_id': None})
         if response.status_code == 200:
@@ -84,15 +101,6 @@ def prompt_base_page():
         else:
             st.error("Failed to find the prompt.")
             return False, {}
-
-    def update_prompt(tabel_name, prompt_id, domain_name, task_name, cls_name, args=None, query_args=None, answer_args=None, evaluate_args=None, query_prompt=None, answer_prompt=None, evaluate_prompt=None, prompt=None):
-        response = requests.post(PROMPT_UPDATE, json={'tabel_name': tabel_name, 'domain_name': domain_name, 'task_name': task_name, 'cls_name': cls_name, 'prompt': prompt, 'args': args, 'query_prompt': query_prompt, 'query_args': query_args, 'answer_prompt': answer_prompt, 'answer_args': answer_args, 'evaluate_prompt': evaluate_prompt, 'evaluate_args': evaluate_args, 'keyword': None, 'prompt_id': prompt_id})
-        if response.status_code == 200:
-            st.success("Prompt update successfully!")
-            return response.json().get('status', False), response.json().get('prompt_data', {})
-        else:
-            st.error("Failed to update the prompt.")
-            return False, []
 
     def on_mode_change():
         mode = st.session_state.mode
@@ -174,14 +182,24 @@ def prompt_base_page():
                 st.dataframe(data, width=800, height=400)
                 st.subheader('如果需要修改数据，请填写以下信息。')
             if tabel_name == 'all_prompt':
+                first_query_prompt = st.text_input("first_query_prompt", key="first_query_prompt",)
+                
                 query_prompt = st.text_input("query_prompt", key="query_prompt",)
+                
                 answer_prompt = st.text_input("answer_prompt", key="answer_prompt",)
+                
                 evaluate_prompt = st.text_input("evaluate_prompt", key="evaluate_prompt",)
+                
+                first_query_args = st.text_input("first_query_prompt 中含有的参数，请用空格分开同种类型的，用;(英文)分开不同类型的", key="first_query_args",)
+                
                 query_args = st.text_input("query_prompt 中含有的参数，请用空格分开同种类型的，用;(英文)分开不同类型的", key="query_args",)
+                
                 answer_args = st.text_input("answer_prompt 中含有的参数，请用空格分开同种类型的，用;(英文)分开不同类型的", key="answer_args",)
+                
                 evaluate_args = st.text_input("evaluate_prompt 中含有的参数，请用空格分开同种类型的，用;(英文)分开不同类型的", key="evaluate_args",)
             else:
                 prompt = st.text_input("prompt", key="prompt",)
+                
                 args = st.text_input("prompt中含有的参数，请用空格分开同种类型的，用;(英文)分开不同类型的", key="args",)
 
             if st.button("上传prompt"):
@@ -203,9 +221,11 @@ def prompt_base_page():
                             task_name=task_name, 
                             cls_name=cls_name,  
                             query_args=query_args, 
+                            first_query_args=first_query_args, 
                             answer_args=answer_args, 
                             evaluate_args=evaluate_args, 
                             query_prompt=query_prompt, 
+                            first_query_prompt=first_query_prompt, 
                             answer_prompt=answer_prompt, 
                             evaluate_prompt=evaluate_prompt,)
                     else:

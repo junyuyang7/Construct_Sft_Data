@@ -37,8 +37,10 @@ class PromptBase(BaseModel):
     prompt: Union[str, None]
     args: Union[str, None]
     query_prompt: Union[str, None]
+    first_query_prompt: Union[str, None]
     answer_prompt: Union[str, None]
     evaluate_prompt: Union[str, None]
+    first_query_args: Union[str, None]
     query_args: Union[str, None]
     answer_args: Union[str, None]
     evaluate_args: Union[str, None]
@@ -122,13 +124,26 @@ async def upload(files: List[UploadFile]):
 @app.post('/prompt_upload/')
 async def prompt_upload(prompt_data: PromptBase):
     db = DBService(tabel_name=prompt_data.tabel_name)
-    status = db.insert_data(prompt_data.domain_name, prompt_data.task_name, prompt_data.cls_name, prompt_data.args, prompt_data.query_args, prompt_data.answer_args, prompt_data.evaluate_args, prompt_data.query_prompt, prompt_data.answer_prompt, prompt_data.evaluate_prompt, prompt_data.prompt)
+    status = db.insert_data(prompt_data.domain_name, 
+                            prompt_data.task_name, 
+                            prompt_data.cls_name, 
+                            prompt_data.args, 
+                            prompt_data.first_query_args, 
+                            prompt_data.query_args, 
+                            prompt_data.answer_args, 
+                            prompt_data.evaluate_args, 
+                            prompt_data.first_query_prompt, 
+                            prompt_data.query_prompt, 
+                            prompt_data.answer_prompt, 
+                            prompt_data.evaluate_prompt, 
+                            prompt_data.prompt)
     return {'status': status, 'prompt_data': prompt_data.model_dump()}
 
 @app.post('/prompt_list/')
 async def prompt_list(prompt_data: PromptList):
     db = DBService(tabel_name=prompt_data.tabel_name)
     prompt_dict = db.get_all_data()
+    # prompt_dict = [{}, {}, {}, ....] List[dict]
     return {'data': prompt_dict}
     
 @app.post('/prompt_delete/')
@@ -137,6 +152,7 @@ async def prompt_delete(prompt_data: PromptList):
     resp = db.delete_data(prompt_data.prompt_id)
     return {'status': resp}
 
+# TODO
 @app.post('/prompt_search_keyword/')
 async def prompt_search(prompt_data: PromptBase):
     db = DBService(tabel_name=prompt_data.tabel_name)
@@ -146,7 +162,19 @@ async def prompt_search(prompt_data: PromptBase):
 @app.post('/prompt_update/')
 async def prompt_update(prompt_data: PromptBase):
     db = DBService(tabel_name=prompt_data.tabel_name)
-    resp = db.update_data(prompt_data.domain_name, prompt_data.task_name, prompt_data.cls_name, prompt_data.args, prompt_data.query_args, prompt_data.answer_args, prompt_data.evaluate_args, prompt_data.query_prompt, prompt_data.answer_prompt, prompt_data.evaluate_prompt, prompt_data.prompt)
+    resp = db.update_data(prompt_data.domain_name, 
+                        prompt_data.task_name, 
+                        prompt_data.cls_name, 
+                        prompt_data.args, 
+                        prompt_data.first_query_args, 
+                        prompt_data.query_args, 
+                        prompt_data.answer_args, 
+                        prompt_data.evaluate_args, 
+                        prompt_data.first_query_prompt, 
+                        prompt_data.query_prompt, 
+                        prompt_data.answer_prompt, 
+                        prompt_data.evaluate_prompt, 
+                        prompt_data.prompt)
     return {'status': resp, 'prompt_data': prompt_data.model_dump()}
 
 # SftData_base api

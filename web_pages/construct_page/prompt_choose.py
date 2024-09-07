@@ -102,7 +102,7 @@ def test_prompt():
         st.toast(text)
 
     # 将数据填入对应的prompt中的{$keyword}
-    def get_final_prompt(selected_prompts, data):
+    def get_final_prompt(selected_prompts: List[dict], data: List[dict]) -> List[dict]:
         final_prompt_lst = []
         for i, prompt in enumerate(selected_prompts):
             keywords_data = data[i][0].keys()
@@ -135,7 +135,7 @@ def test_prompt():
     if tabel_name in ['query_prompt', 'answer_prompt', 'evaluate_prompt', 'all_prompt']:
         # 展示数据库中的prompt
         prompt_data = list_all_prompt(tabel_name, )
-        data_df = pd.DataFrame(prompt_data)
+        # data_df = pd.DataFrame(prompt_data)
         
         options = [
             f"domain_name: {item['domain_name']}, task_name: {item['task_name']}, cls_name: {item['cls_name']}"
@@ -170,14 +170,22 @@ def test_prompt():
             # st.write("本地保存的文件路径：", set(local_resp))
             final_prompt_lst = get_final_prompt(selected_prompts, data)
             st.session_state['final_prompt_lst'] = final_prompt_lst
-            final_prompt_df = pd.DataFrame({
-                'query_prompt': final_prompt_lst[0]['query_prompt'],
-                'answer_prompt': final_prompt_lst[0]['answer_prompt'],
-                'evaluate_prompt': final_prompt_lst[0]['evaluate_prompt'],
-                })
-            if 'final_prompt_df' not in st.session_state:
-                st.session_state['final_prompt_df'] = final_prompt_df
-            st.dataframe(final_prompt_df, height=400, width=800)
+            
+            final_prompt_df_lst = []
+            for final_prompt in final_prompt_lst:
+                final_prompt_df = pd.DataFrame({
+                    'query_prompt': final_prompt['query_prompt'],
+                    'answer_prompt': final_prompt['answer_prompt'],
+                    'evaluate_prompt': final_prompt['evaluate_prompt'],
+                    })
+                final_prompt_df_lst.append(final_prompt_df)
+                
+            if 'final_prompt_df_lst' not in st.session_state:
+                st.session_state['final_prompt_df_lst'] = final_prompt_df_lst
+                
+            for i, prompt_df in enumerate(final_prompt_df_lst):
+                with st.expander(f"这是{final_prompt_lst[i]['domain_name']}的构造数据集"):
+                    st.dataframe(prompt_df, width=800, height=300)
         
         # if st.button('开始构造数据'):
         #     test_query()

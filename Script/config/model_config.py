@@ -1,4 +1,40 @@
 import os
+from dataclasses import dataclass
+import time
+
+llm_model_dict = {
+    'chatglm2-6b': "/home/yangjy/Study/ChatAgent_RAG/llm_models/chatglm3-6b/"
+}
+
+@dataclass
+class Args:
+    model_path: str = llm_model_dict['chatglm2-6b']
+    temperature: float = 1.0
+    top_p: float = 1.0
+    n: int = 1
+    repeat: int = None
+    total_prompts: int = 1000
+    max_tokens: int = 512
+    max_model_len: int = 1024
+    early_stopping: bool = True
+    disable_early_stopping: bool = False
+    system_prompt: bool = False
+    sanitize: bool = False
+    logits_processor: bool = False
+    control_tasks: str = None
+    shuffle: bool = True
+    skip_special_tokens: bool = True
+    checkpoint_every: int = 100
+    engine: str = "vllm"
+    device: str = "1"
+    dtype: str = "bfloat16"
+    tensor_parallel_size: int = 1
+    gpu_memory_utilization: float = 0.95
+    swap_space: float = 2.0
+    output_folder: str = "../test_data"
+    job_name: str = None
+    timestamp: int = int(time.time())
+    seed: int = None  # Random seed
 
 # 可以指定一个绝对路径，统一存放所有的Embedding和LLM模型。
 # 每个模型可以是一个单独的目录，也可以是某个目录下的二级子目录。

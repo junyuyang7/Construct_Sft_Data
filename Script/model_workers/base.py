@@ -9,25 +9,85 @@ import numpy as np
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from vllm import LLM, SamplingParams
-import str_utils
+from Script.config import Args
+# from accelerate import init_empty_weights, infer_auto_device_map
 
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+os.environ['CUDA_VISIBLE_DEVICES'] = '2,3,4,5,6,7'
 
 class LLMModelBase:
-    def __init__(self, args) -> None:
+    def __init__(self, args: Args) -> None:
         self.args = args
+        # Load the model and tokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained(self.args.model_path, trust_remote_code=True)
+        if self.args.engine == "vllm":
+            # Create vllm instance  
+            self.llm = LLM(
+                model=self.args.model_path,
+                trust_remote_code=True,
+                tokenizer=self.args.model_path,
+                tokenizer_mode='slow',
+                tensor_parallel_size=1
+            )
+            
+            def de_md_logits_processor_for_llama3_1(token_ids, logits):
+                # Only process the initial logits
+                if len(token_ids) == 0:
+                    logits[2] = -9999.999 # "#": 2,
+                    logits[567] = -9999.999 # "##": 567,
+                    logits[14711] = -9999.999 # "###": 14711,
+                    logits[827] = -9999.999 # "####": 827,
+
+                return logits
+
+            if self.args.logits_processor and "llama-3.1" in self.args.model_path.lower():
+                logits_processor = de_md_logits_processor_for_llama3_1
+                print(f"Logits processor applied: {logits_processor}")
+            else:
+                logits_processor = None
+                
+            # Define sampling parameters
+            self.sampling_params = SamplingParams(
+                # n=self.args.n,
+                temperature=self.args.temperature,
+                top_p=self.args.top_p,
+                max_tokens=self.args.max_tokens,
+                skip_special_tokens=self.args.skip_special_tokens,
+                logits_processors=[logits_processor] if logits_processor else None
+            )
+        
+        elif self.args.engine == "hf":
+            # # 初始化多卡推理的设备映射
+            # with init_empty_weights():
+            #     model = AutoModelForCausalLM.from_pretrained(
+            #         self.args.model_path,
+            #         torch_dtype=torch.bfloat16 if self.args.dtype == "bfloat16" else torch.float16
+            #     )
+
+            # # 使用 accelerate 自动推理设备映射
+            # device_map = infer_auto_device_map(
+            #     model,
+            #     max_memory={i: '20GB' for i in range(4)},  # 根据实际 GPU 内存进行配置
+            #     no_split_module_classes=["LlamaDecoderLayer"],  # 根据模型结构进行模块划分
+            # )
+            
+            # 加载模型到多 GPU 上
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.args.model_path,
+                device_map={0: 'cuda:1'},
+                torch_dtype=torch.bfloat16 if self.args.dtype == "bfloat16" else torch.float16
+            )
 
     def get_model(self):
         if self.args.engine == "vllm":
             # Create vllm instance  
-            llm = LLM(model=self.args.model_path, 
-                    dtype=self.args.dtype,
-                    trust_remote_code=True,
-                    gpu_memory_utilization=self.args.gpu_memory_utilization,
-                    max_model_len=self.args.max_model_len,
-                    swap_space=self.args.swap_space,
-                    tensor_parallel_size=self.args.tensor_parallel_size,
-                    seed=self.args.seed if self.args.seed is not None else self.args.timestamp,
-                    enable_prefix_caching=True)
+            llm = LLM(
+                model=self.args.model_path,
+                trust_remote_code=True,
+                tokenizer=self.args.model_path,
+                tokenizer_mode='slow',
+                tensor_parallel_size=1
+            )
             
             def de_md_logits_processor_for_llama3_1(token_ids, logits):
                 # Only process the initial logits
@@ -47,13 +107,11 @@ class LLMModelBase:
                 
             # Define sampling parameters
             sampling_params = SamplingParams(
-                n=self.args.n,
+                # n=self.args.n,
                 temperature=self.args.temperature,
                 top_p=self.args.top_p,
                 max_tokens=self.args.max_tokens,
                 skip_special_tokens=self.args.skip_special_tokens,
-                stop=self.stop_tokens,
-                stop_token_ids=self.stop_token_ids,
                 logits_processors=[logits_processor] if logits_processor else None
             )
             
@@ -62,29 +120,41 @@ class LLMModelBase:
         elif self.args.engine == "hf":
             # Load the model and tokenizer
             tokenizer = AutoTokenizer.from_pretrained(self.args.model_path)
+            
+            # # 初始化多卡推理的设备映射
+            # with init_empty_weights():
+            #     model = AutoModelForCausalLM.from_pretrained(
+            #         self.args.model_path,
+            #         torch_dtype=torch.bfloat16 if self.args.dtype == "bfloat16" else torch.float16
+            #     )
+
+            # # 使用 accelerate 自动推理设备映射
+            # device_map = infer_auto_device_map(
+            #     model,
+            #     max_memory={i: '20GB' for i in range(4)},  # 根据实际 GPU 内存进行配置
+            #     no_split_module_classes=["LlamaDecoderLayer"],  # 根据模型结构进行模块划分
+            # )
+            
+            # 加载模型到多 GPU 上
             model = AutoModelForCausalLM.from_pretrained(
                 self.args.model_path,
-                device_map={'':torch.cuda.current_device()},
+                device_map={0: 'cuda:1'},
                 torch_dtype=torch.bfloat16 if self.args.dtype == "bfloat16" else torch.float16
             )
             return model, tokenizer
-        
-    def generate(self, prompt):
+     
+    def generate_mask(self, input_lst, mask_lst):
+        # 记录 value=1 的 index 位置
+        mask_index = [index for index, value in enumerate(mask_lst) if value == 1]
+        filter_input_lst = [input_lst[i] for i in mask_index]
         if self.args.engine == "vllm":
-            llm, sampling_params = self.get_model()
-            outputs = llm.generate(prompt, sampling_params)
-            # output_list = outputs[0].outputs
-            # if self.args.shuffle:
-            #     random.shuffle(output_list)
-                
+            outputs = self.llm.generate(filter_input_lst, self.sampling_params)
+            outputs_lst = [q.outputs[0].text for q in outputs]
+            
         elif self.args.engine == "hf":
-            model, tokenizer = self.get_model()
-            inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).to(torch.cuda.current_device())
-            # Gemma-2 bug, so we cannot set num_return_sequences > 1. 
-            # Instead, we repeat the input n times.
-            # inputs = input.repeat(self.args.n, 1).to(torch.cuda.current_device())
-            outputs = model.generate(**inputs,
-                                    tokenizer=tokenizer, 
+            inputs = self.tokenizer(filter_input_lst, return_tensors="pt", padding=True, truncation=True).to('cuda: 1')
+            outputs = self.model.generate(**inputs,
+                                    tokenizer=self.tokenizer, 
                                     do_sample=True, 
                                     temperature=self.args.temperature, 
                                     top_p=self.args.top_p, 
@@ -92,28 +162,35 @@ class LLMModelBase:
                                     num_return_sequences=1,
                                     )
             # Remove the input from the output
-            output_list = tokenizer.batch_decode(outputs[i][len(inputs[i]):] for i in range(len(outputs)))
-            # Stop on the first stop token
-            for i, completion in enumerate(output_list):
-                for stop_token in self.stop_tokens:
-                    if stop_token in completion:
-                        output_list[i] = completion[:completion.index(stop_token)]
+            outputs_lst = self.tokenizer.batch_decode(outputs[i][len(inputs[0]):] for i in range(len(filter_input_lst)))
         
-        return output_list
+        return outputs_lst, mask_index
     
-    def generate_mt(self, prompt, history_json):
-        model, tokenizer = self.get_model()
-        template = tokenizer.apply_chat_template(history_json, tokenize=False, add_generation_prompt=False)
-        prompt = prompt.format(history=template)
-
+    def get_template_dialog(self, dialog_lst, prompt_lst):
+        temp_lst = []
+        new_dialog_lst = []
+        
+        for dialog, prompt in zip(dialog_lst, prompt_lst):
+            template = self.tokenizer.apply_chat_template(dialog, tokenize=False, add_generation_prompt=False)
+            new_dialog_lst.append(template)
+            template += prompt
+            temp_lst.append(template)
+            
+        return temp_lst, new_dialog_lst
+        
+    def generate_first(self, query_prompt_lst, answer_prompt_lst):
+        # 储存 chat 数据
+        chat_lst = []
+        
+        # 构造指令
         if self.args.engine == "vllm":
-            llm, sampling_params = self.get_model()
-            output = llm.generate(prompt, sampling_params)
-                
+            querys = self.llm.generate(query_prompt_lst, self.sampling_params)
+            querys_lst = [q.outputs[0].text for q in querys]
+            
         elif self.args.engine == "hf":
-            inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).to(torch.cuda.current_device())
-            output = model.generate(**inputs,
-                                    tokenizer=tokenizer, 
+            inputs = self.tokenizer(query_prompt_lst, return_tensors="pt", padding=True, truncation=True).to('cuda: 1')
+            querys = self.model.generate(**inputs,
+                                    tokenizer=self.tokenizer, 
                                     do_sample=True, 
                                     temperature=self.args.temperature, 
                                     top_p=self.args.top_p, 
@@ -121,18 +198,117 @@ class LLMModelBase:
                                     num_return_sequences=1,
                                     )
             # Remove the input from the output
-            # output_list = tokenizer.batch_decode(outputs[i][len(inputs[i]):] for i in range(len(outputs)))
-            output_text = tokenizer.decode(output[len(inputs):])
-            # Stop on the first stop token
-            # for i, completion in enumerate(output_list):
-            #     for stop_token in self.stop_tokens:
-            #         if stop_token in completion:
-            #             output_list[i] = completion[:completion.index(stop_token)]
-            tmp_output = output_text
-            for stop_token in self.stop_tokens:
-                if stop_token in tmp_output:
-                    output_text = tmp_output[:tmp_output.index(stop_token)]
-
-        return output, tokenizer
+            querys_lst = self.tokenizer.batch_decode(querys[i][len(inputs[0]):] for i in range(len(query_prompt_lst)))
+            
+        query_temp_lst = []
+        for query in querys_lst:
+            chat = [{"role": "user", "content": query}]
+            # add_generation_prompt=True 可以添加一些生成提示标记如 <|im_start|>assistant
+            template = self.tokenizer.apply_chat_template(chat, tokenize=False, add_generation_prompt=True)
+            query_temp_lst.append(template)
+            chat_lst.append(chat)
+            
+        new_answer_prompt_lst = []
+        for query_temp, answer_prompt in zip(query_temp_lst, answer_prompt_lst):
+            answer_prompt = answer_prompt.format(query=query_temp)
+            new_answer_prompt_lst.append(answer_prompt)
+        
+        # 构造指令的答案
+        if self.args.engine == "vllm":
+            answers = self.llm.generate(new_answer_prompt_lst, self.sampling_params)
+            answers_lst = [q.outputs[0].text for q in answers]
+            
+        elif self.args.engine == "hf":
+            inputs = self.tokenizer(new_answer_prompt_lst, return_tensors="pt", padding=True, truncation=True).to('cuda: 1')
+            answers = self.model.generate(**inputs,
+                                    tokenizer=self.tokenizer, 
+                                    do_sample=True, 
+                                    temperature=self.args.temperature, 
+                                    top_p=self.args.top_p, 
+                                    max_length=self.args.max_tokens, 
+                                    num_return_sequences=1,
+                                    )
+            # Remove the input from the output
+            answers_lst = self.tokenizer.batch_decode(answers[i][len(inputs[0]):] for i in range(len(answers)))
+        
+        for i, ans in enumerate(answers_lst):
+            chat_lst[i].append({"role": "assistant", "content": ans})
+        
+        return chat_lst
+    
+    def generate_mt(self, query_prompt_lst, answer_prompt_lst, turn_lst, first_dialog_lst):
+        chat_lst = first_dialog_lst
+        max_turn = max(turn_lst)
+        
+        # 修改首轮对话的格式
+        temp_lst, _ = self.get_template_dialog(first_dialog_lst, query_prompt_lst)
+        
+        for i in range(2, max_turn+1):
+            # 标记每个prompt是否已经生成到头了
+            is_end_lst = [1 if t >= i else 0 for t in turn_lst]
+            # 生成指令 query
+            query_lst, mask_index = self.generate_mask(temp_lst, is_end_lst)
+            for index, query in zip(mask_index, query_lst):
+                chat_lst[index].append({"role": "user", "content": query})  
+            temp_lst, _ = self.get_template_dialog(chat_lst, answer_prompt_lst)  
+                
+            # 生成答案 answer
+            answer_lst, mask_index = self.generate_mask(temp_lst, is_end_lst)
+            for index, answer in zip(mask_index, answer_lst):
+                chat_lst[index].append({"role": "assistant", "content": answer})  
+            temp_lst, _ = self.get_template_dialog(chat_lst, answer_prompt_lst)  
+        
+        return chat_lst
+    
+    def generate_eval(self, evaluate_prompt_lst, full_dialog_lst):
+        temp_lst, dialog_lst = self.get_template_dialog(full_dialog_lst, evaluate_prompt_lst)
+        if self.args.engine == "vllm":
+            outputs = self.llm.generate(temp_lst, self.sampling_params)
+            outputs_lst = [q.outputs[0].text for q in outputs]
+            
+        elif self.args.engine == "hf":
+            inputs = self.tokenizer(temp_lst, return_tensors="pt", padding=True, truncation=True).to('cuda: 1')
+            outputs = self.model.generate(**inputs,
+                                    tokenizer=self.tokenizer, 
+                                    do_sample=True, 
+                                    temperature=self.args.temperature, 
+                                    top_p=self.args.top_p, 
+                                    max_length=self.args.max_tokens, 
+                                    num_return_sequences=1,
+                                    )
+            # Remove the input from the output
+            outputs_lst = self.tokenizer.batch_decode(outputs[i][len(inputs[0]):] for i in range(len(temp_lst)))
+        
+        return outputs_lst, dialog_lst
+    
+    
+if __name__ == '__main__':
+    def test_vllm():
+        prompts = [
+            "Hello, my name is",
+            "The president of the United States is",
+            "The capital of France is",
+            "The future of AI is",
+            "今天天气真好，咱们出去",
+            "明天就要开学了，我的作业还没写完，",
+            "请你介绍一下你自己。AI："
+        ]
+        sampling_params = SamplingParams(temperature=0.8, top_p=0.95, max_tokens=2048)
+        model_path = "/home/yangjy/Study/ChatAgent_RAG/llm_models/chatglm3-6b/"
+        llm = LLM(
+            model=model_path,
+            trust_remote_code=True,
+            tokenizer=model_path,
+            tokenizer_mode='slow',
+            tensor_parallel_size=1
+        )
+        outputs = llm.generate(prompts, sampling_params)
+        # Print the outputs.
+        for output in outputs:
+            prompt = output.prompt
+            generated_text = output.outputs[0].text
+            print(f"Prompt: {prompt!r}, Generated text: {generated_text!r}")
+    
+    test_vllm()
     
     
