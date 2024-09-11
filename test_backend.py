@@ -3,19 +3,19 @@ from pydantic import BaseModel
 import uvicorn
 from typing import *
 import os
-# from Script.create_db import DBconnecter
-from Script.data_base.kb_service import DBService
+# from Server.create_db import DBconnecter
+from Server.data_base.kb_service import DBService
 import json
 import torch
 from transformers import AutoConfig, AutoModel, AutoTokenizer, LlamaForCausalLM
 
-from Script.model_workers.base import LLMModelBase
-from Script.config import Args, llm_model_dict
+from Server.model_workers.base import LLMModelBase
+from Server.config import Args, llm_model_dict, device_ids
 from web_pages.utils import construct_dialog
 # from utils import xuanji_api
 
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
-os.environ['CUDA_VISIBLE_DEVICES'] = '2,3,4,5'
+os.environ['CUDA_VISIBLE_DEVICES'] = device_ids
 UPLOAD_DIRECTORY = "./uploaded_files"
 os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
 
@@ -134,7 +134,7 @@ async def construct_sft_data(request: Request):
     
     if not model_name or final_prompt_lst:
         return {"error": "Model name not provided"}
-    ans_df_lst, filter_prompt_lst = construct_dialog(final_prompt_lst, model_name)
+    ans_df_lst, filter_prompt_lst = construct_dialog(final_prompt_lst, llm_model)
     
     return {'ans_df_lst': ans_df_lst, 'filter_prompt_lst': filter_prompt_lst}
 

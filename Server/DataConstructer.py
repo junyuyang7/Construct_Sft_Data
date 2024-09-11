@@ -1,8 +1,8 @@
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from Script.ModelBase import AskModel, JudgeModel, AnswerModel, TopicModel
-from Script.model_workers.base import LLMModelBase, Args
+from Server.ModelBase import AskModel, JudgeModel, AnswerModel, TopicModel
+from Server.model_workers.base import LLMModelBase, Args
 from typing import *
 import json
 import pandas as pd
@@ -14,42 +14,61 @@ class DataConstructer:
     def load_model(self, model_name):
         return 'test_load_model'
 
-    def chat(self, query_prompt_lst=None, answer_prompt_lst=None, evaluate_prompt_lst=None, turn_lst=None, first_dialog_lst=None, full_dialog_lst=None, mode='first'):
-        if mode == 'mt':
-            output = self.llm_model.generate_mt(query_prompt_lst, answer_prompt_lst, turn_lst, first_dialog_lst)
-        elif mode == 'first':
-            output = self.llm_model.generate_first(query_prompt_lst, answer_prompt_lst)
+    def chat(self, first_query_prompt_lst=None, 
+                    querys_lst = None, 
+                    query_prompt=None, 
+                    answer_prompt=None, 
+                    evaluate_prompt=None, 
+                    turn_lst=None, 
+                    first_dialog_lst=None, 
+                    full_dialog_lst=None, 
+                    mode='first_query'):
+        
+        if mode == 'first_query':
+            # output = [[], [], []]
+            output = self.llm_model.generate_first_query(first_query_prompt_lst)
+            
+        # output = []
+        elif mode == 'first_answer':
+            output = self.llm_model.generate_first_answer(querys_lst, answer_prompt) 
+            
+        elif mode == 'mt':
+            output = self.llm_model.generate_mt(query_prompt, answer_prompt, turn_lst, first_dialog_lst)
+            
         elif mode == 'eval':
-            output = self.llm_model.generate_eval(evaluate_prompt_lst, full_dialog_lst)
+            output = self.llm_model.generate_eval(evaluate_prompt, full_dialog_lst)
             
         return output
+    
+    def construct_first_query(self, final_prompt):
+        first_query_prompt_lst = final_prompt['first_query_prompt']
 
-    def construct_first_dialog(self, final_prompt):
-        query_prompt_lst, answer_prompt_lst = final_prompt['first_query_prompt'], final_prompt['answer_prompt']
+        first_querys_lst = self.chat(
+            first_query_prompt_lst=first_query_prompt_lst, 
+            mode='first_query')
         
+        return first_querys_lst
+
+    def construct_first_answer(self, querys_lst, answer_prompt):
         # first_dialog = [[{}, {}], [{}, {}, ...], ...]
         first_dialog_lst = self.chat(
-            query_prompt_lst=query_prompt_lst, 
-            answer_prompt_lst=answer_prompt_lst,
-            mode='first')
+            querys_lst=querys_lst, 
+            answer_prompt=answer_prompt,
+            mode='first_answer')
         
         return first_dialog_lst
 
-    def construct_mt_dialog(self, final_prompt, first_dialog_lst):
-        query_prompt_lst, answer_prompt_lst, turn_lst = final_prompt['query_prompt'], final_prompt['answer_prompt'], final_prompt['turn']
-        
+    def construct_mt_dialog(self, query_prompt_lst, answer_prompt_lst, turn_lst, first_dialog_lst):
         full_dialog = self.chat(
-            query_prompt_lst=query_prompt_lst, 
-            answer_prompt_lst=answer_prompt_lst, 
+            query_prompt=query_prompt_lst, 
+            answer_prompt=answer_prompt_lst, 
             turn_lst=turn_lst, 
             first_dialog_lst=first_dialog_lst,
             mode='mt')
         
         return full_dialog
     
-    def evaluate_dialog(self, final_prompt, full_dialog_lst):
-        evaluate_prompt_lst = final_prompt['evaluate_prompt']
-        
+    def evaluate_dialog(self, evaluate_prompt, full_dialog_lst):
         # filter_data, data_with_filter_reason = [], []
         def parse_reasult(text_lst):
             score_lst, reason_lst = [], []
@@ -67,7 +86,7 @@ class DataConstructer:
             return score_lst, reason_lst
 
         eval_output, dialog_lst = self.chat(
-            evaluate_prompt_lst=evaluate_prompt_lst,
+            evaluate_prompt=evaluate_prompt,
             full_dialog_lst=full_dialog_lst,
             mode='eval'
         )
@@ -87,16 +106,32 @@ class DataConstructer:
         
         
         for i, final_prompt in enumerate(final_prompt_lst):
-            # 1.构造首轮对话数据
-            first_dialog_lst = self.construct_first_dialog(final_prompt)
+            query_prompt_lst, answer_prompt_lst, evaluate_prompt_lst, turn_lst = \
+                final_prompt['query_prompt'], final_prompt['answer_prompt'], final_prompt['evaluate_prompt'], final_prompt['turn_lst']
+                
+            final_df_all = pd.DataFrame({
+                'full_dialog': [],
+                'dialog': [],
+                'score': [] ,
+                'reason': []
+            })
+                
+            # 1.构造首轮对话 query
+            first_querys_lst = self.construct_first_query(final_prompt)
             
-            # 2.迭代构造后几轮对话
-            full_dialog_lst = self.construct_mt_dialog(final_prompt, first_dialog_lst)
-            final_prompt_lst[i]['chat'] = full_dialog_lst
-            
-            # 3.进行评估
-            final_df = self.evaluate_dialog(final_prompt, full_dialog_lst)
-            final_df_lst.append(final_df)
+            for first_querys, qp, ap, ep, turns in zip(first_querys_lst, query_prompt_lst, answer_prompt_lst, evaluate_prompt_lst, turn_lst):
+                # 2.构造首轮对话 answer
+                first_dialog_lst = self.construct_first_answer(first_querys, ap)
+                
+                # 2.迭代构造后几轮对话
+                full_dialog_lst = self.construct_mt_dialog(qp, ap, turns, first_dialog_lst)
+                final_prompt_lst[i]['chat'] = full_dialog_lst
+                
+                # 3.进行评估
+                final_df = self.evaluate_dialog(ep, full_dialog_lst)
+                final_df_all = pd.concat([final_df_all, final_df], ignore_index=True)
+                
+            final_df_lst.append(final_df_all)
 
         # 5.返回评估的结果
         return final_df_lst, final_prompt_lst
@@ -134,13 +169,13 @@ if __name__ == '__main__':
             
     def test():
         llm_model_dict = {
-            'chatglm2-6b': "/home/yangjy/Study/ChatAgent_RAG/llm_models/chatglm3-6b/",
+            'chatglm3-6b': "/home/yangjy/Study/ChatAgent_RAG/llm_models/chatglm3-6b/",
             'test': 'test'
         }
         from dataclasses import dataclass
         @dataclass
         class Args:
-            model_name: str = "chatglm2-6b"
+            model_name: str = "chatglm3-6b"
             model_path: str = llm_model_dict[model_name]
         args = Args()
         model_name = 'test'

@@ -9,11 +9,11 @@ import json
 from abc import ABC, abstractmethod
 from sqlalchemy import create_engine, and_, or_, MetaData, text, inspect
 from sqlalchemy.orm import sessionmaker
-from Script.db.models import QueryPrompt, AnswerPrompt, EvaluatePrompt, AllPrompt, SFTDataModel, FirstQueryPrompt
-from Script.db.repository import (PromptAction, add_history_to_db, list_history_from_db, find_history_from_keyword, history_exists, delete_history_from_db, update_history_from_db)
+from Server.db.models import QueryPrompt, AnswerPrompt, EvaluatePrompt, AllPrompt, SFTDataModel, FirstQueryPrompt
+from Server.db.repository import (PromptAction, add_history_to_db, list_history_from_db, find_history_from_keyword, history_exists, delete_history_from_db, update_history_from_db)
 from sqlalchemy.exc import SQLAlchemyError
 from utils import get_db_path
-from Script.config import SQLALCHEMY_DATABASE_URI
+from Server.config import SQLALCHEMY_DATABASE_URI
 
 ModelType = {
     'answer_prompt': AnswerPrompt,

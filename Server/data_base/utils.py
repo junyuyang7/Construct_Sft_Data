@@ -1,6 +1,6 @@
 import importlib
 import os
-from Script.config import KB_ROOT_PATH
+from Server.config import KB_ROOT_PATH
 
 def get_db_path(knowledge_base_name: str):
     '''获取知识库路径'''

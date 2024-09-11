@@ -5,8 +5,8 @@
 # import sqlite3
 # from sqlalchemy import create_engine, and_, or_, MetaData, text
 # from sqlalchemy.orm import sessionmaker
-# from Script.db.models import PromptModel, SFTDataModel
-# from Script.db.repository import (add_prompt_to_db, list_prompts_from_db, find_prompt_from_keyword, prompt_exists, delete_prompt_from_db, update_prompt_from_db, add_history_to_db, list_history_from_db, find_history_from_keyword, history_exists, delete_history_from_db, update_history_from_db)
+# from Server.db.models import PromptModel, SFTDataModel
+# from Server.db.repository import (add_prompt_to_db, list_prompts_from_db, find_prompt_from_keyword, prompt_exists, delete_prompt_from_db, update_prompt_from_db, add_history_to_db, list_history_from_db, find_history_from_keyword, history_exists, delete_history_from_db, update_history_from_db)
 # from sqlalchemy.exc import SQLAlchemyError
 
 # ModelType = {
@@ -123,7 +123,7 @@
 #     # session = Session()
 
 #     # import pandas as pd
-#     # df = pd.read_excel('Script/test.xlsx')
+#     # df = pd.read_excel('Server/test.xlsx')
 
 #     # for _, row in df.iterrows():
 #     #     new_id = db.insert_prompt(

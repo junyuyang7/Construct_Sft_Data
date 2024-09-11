@@ -5,7 +5,7 @@ from streamlit_option_menu import option_menu
 from fastapi import UploadFile
 import os
 from typing import *
-from Script.config import KEYWORD_FILE, DATA_FILE
+from Server.config import KEYWORD_FILE, DATA_FILE
 import pandas as pd
 import re
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, AgGridTheme
@@ -51,8 +51,10 @@ def test_query():
     try:
         final_prompt_lst = st.session_state['final_prompt_lst']
         final_prompt_df_lst = st.session_state['final_prompt_df_lst']
-        assert len(final_prompt_df_lst) == len(final_prompt_lst), "final_prompt_df_lst 和 final_prompt_lst 不一样长"
+        all_num_lst = st.session_state['all_num_lst']
         len_prompt_lst = len(final_prompt_df_lst)
+        
+        assert len(final_prompt_df_lst) == len(final_prompt_lst), "final_prompt_df_lst 和 final_prompt_lst 不一样长"
     except:
         st.warning('你需要先选好Prompt')
         
@@ -72,12 +74,15 @@ def test_query():
             load_model(model_name)
 
     turn_range = st.slider('选择需要构造的对话轮数', min_value=0, max_value=20, value=(5, 9))
-    
-    turn = random.randint(turn_range[0], turn_range[1])
     st.write("<h2 style='text-align: center; font-size: 16px; color: gray;'>以下是待进行数据构建的prompt</h2>", unsafe_allow_html=True)
 
     for i in range(len_prompt_lst):
-        turn_lst = [random.randint(turn_range[0], turn_range[1]) for _ in range(len(final_prompt_df_lst[i]))]
+        turn_lst = []
+        for num_class in all_num_lst:
+            # eg: num_class = [2, 2, 4] turn = [[3,3], [4,2], [2,5,3,6]]
+            turn = [[random.randint(turn_range[0], turn_range[1]) for _ in range(num)] for num in num_class]
+            turn_lst.append(turn)
+
         final_prompt_df_lst[i]['turn'] = turn_lst
         final_prompt_lst[i]['turn'] = turn_lst
         final_prompt_lst[i]['chat'] = []  # 这个字段用来储存对话数据

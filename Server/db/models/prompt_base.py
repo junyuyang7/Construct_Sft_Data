@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import Column, DateTime, String, Integer, ForeignKey
-from Script.db.models.base import BaseModel
+from Server.db.models.base import BaseModel
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()

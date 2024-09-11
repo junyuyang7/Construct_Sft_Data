@@ -7,7 +7,7 @@ from multiprocessing import Process
 from datetime import datetime
 from pprint import pprint
 from fastapi import FastAPI
-from Script.config.basic_config import LOG_PATH, log_verbose
+from Server.config.basic_config import LOG_PATH, log_verbose
 
 try:
     import numexpr # 加速库
@@ -24,7 +24,7 @@ def create_model_worker_app(log_level: str="INFO", **kwargs) -> FastAPI:
     pass
 
 def run_webui(started_event: mp.Event = None, run_mode: str = None): 
-    from Script.utils import set_httpx_config
+    from Server.utils import set_httpx_config
     set_httpx_config()
 
     host = WEBUI_SERVER["host"]

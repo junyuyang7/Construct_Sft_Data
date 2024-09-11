@@ -9,24 +9,22 @@ import httpx
 import contextlib
 import json
 from io import BytesIO #..
-from Script.utils import set_httpx_config, api_address, get_httpx_client
+from Server.utils import set_httpx_config, api_address, get_httpx_client
 
 from pprint import pprint
-from Script.config import HTTPX_DEFAULT_TIMEOUT, logger, log_verbose
-from Script.DataConstructer import DataConstructer
-from Script.model_workers.base import LLMModelBase
-from Script.config import Args, llm_model_dict
+from Server.config import HTTPX_DEFAULT_TIMEOUT, logger, log_verbose
+from Server.DataConstructer import DataConstructer
+from Server.model_workers.base import LLMModelBase
+from Server.config import Args, llm_model_dict
 
 set_httpx_config()
 
 def xuan_ji(sample, model_name):
     return 'this is resp'
 
-def construct_dialog(final_prompt_lst, model_name, llm_model):
-    args = Args()
-    args.model_path = llm_model_dict[model_name]
-    llm_model = LLMModelBase(args)
+def construct_dialog(final_prompt_lst, llm_model):
     data_construct = DataConstructer(llm_model=llm_model)
+    
     final_df_lst, filter_prompt_lst = data_construct.construct_dialogs(final_prompt_lst)
 
     return final_df_lst, filter_prompt_lst

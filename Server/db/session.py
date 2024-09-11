@@ -1,6 +1,6 @@
 from functools import wraps
 from contextlib import contextmanager
-from Script.db.base import SessionLocal
+from Server.db.base import SessionLocal
 from sqlalchemy.orm import Session
 
 # 上下文管理器是指在一段代码执行之前执行一段代码，用于一些预处理工作；执行之后再执行一段代码，用于一些清理工作。

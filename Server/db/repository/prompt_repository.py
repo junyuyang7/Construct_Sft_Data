@@ -1,5 +1,5 @@
-from Script.db.models.prompt_base import AnswerPrompt, EvaluatePrompt, QueryPrompt, AllPrompt, FirstQueryPrompt
-from Script.db.session import with_session
+from Server.db.models.prompt_base import AnswerPrompt, EvaluatePrompt, QueryPrompt, AllPrompt, FirstQueryPrompt
+from Server.db.session import with_session
 from typing import List
 import pandas as pd
 

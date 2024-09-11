@@ -5,7 +5,7 @@ from streamlit_option_menu import option_menu
 from fastapi import UploadFile
 import os
 from typing import *
-from Script.config import KEYWORD_FILE, DATA_FILE
+from Server.config import KEYWORD_FILE, DATA_FILE
 import pandas as pd
 import re
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, AgGridTheme
@@ -34,6 +34,13 @@ def test_prompt():
         
         # 将文件保存到本地指定路径
         local_filenames = save_files_locally(files, save_path)
+        
+        # 确保 data.key() 中含有num
+        try:
+            for d in data:
+                assert 'num' in d[0].keys()
+        except:
+            st.warning("你的文件中没有 num 字段")
 
         # 返回服务器端和本地的文件名
         return server_filenames, data, local_filenames
@@ -81,6 +88,7 @@ def test_prompt():
         # 使用正则表达式提取 {$...} 格式的占位符
         if st.session_state['tabel_name'] == 'all_prompt':
             prompts_dict = {
+                'first_query_prompt': prompt['first_query_prompt'],
                 'query_prompt': prompt['query_prompt'],
                 'answer_prompt': prompt['answer_prompt'],
                 'evaluate_prompt': prompt['evaluate_prompt']
@@ -94,38 +102,37 @@ def test_prompt():
                 st.warning('选择的prompt中key和keyword文件中的key对不上')
 
         return new_prompt
-    
-    # 切换模型
-    def on_mode_change():
-        mode = st.session_state.model_name
-        text = f"已切换到 {mode} 模型。"
-        st.toast(text)
 
     # 将数据填入对应的prompt中的{$keyword}
     def get_final_prompt(selected_prompts: List[dict], data: List[dict]) -> List[dict]:
         final_prompt_lst = []
+        all_num_lst = []
         for i, prompt in enumerate(selected_prompts):
+            num_lst = []
             keywords_data = data[i][0].keys()
             if st.session_state['tabel_name'] == 'all_prompt':
-                prompt_samples = [[], [], []]
-                keys = ['query_prompt', 'answer_prompt', 'evaluate_prompt']
+                prompt_samples = [[], [], [], []]
+                keys = ['first_query_prompt', 'query_prompt', 'answer_prompt', 'evaluate_prompt']
             else:
                 prompt_samples = [[]]
                 keys = ['prompt']
             for sample in data[i]:
+                num_lst.append(int(sample['num']))
                 new_prompt = replace_prompt_keyword(prompt, keywords_data, sample)
                 for j, key in enumerate(keys):
                     prompt_samples[j].append(new_prompt[key])
 
             if st.session_state['tabel_name'] == 'all_prompt':
-                prompt['query_prompt'] = prompt_samples[0]
-                prompt['answer_prompt'] = prompt_samples[1]
-                prompt['evaluate_prompt'] = prompt_samples[2]
+                prompt['first_query_prompt'] = prompt_samples[0]
+                prompt['query_prompt'] = prompt_samples[1]
+                prompt['answer_prompt'] = prompt_samples[2]
+                prompt['evaluate_prompt'] = prompt_samples[3]
             else:
                 prompt['prompt'] = prompt_samples[0]
-                
+            
+            all_num_lst.append(num_lst)
             final_prompt_lst.append(prompt)
-        return final_prompt_lst
+        return final_prompt_lst, all_num_lst
     
     # 1.先展示prompt供用户选择
     tabel_name = st.text_input(
@@ -153,6 +160,7 @@ def test_prompt():
             # 显示选择的 prompts模板 及其详细信息
             for prompt_info in selected_prompts:
                 if tabel_name == 'all_prompt':
+                    st.write(f"First Query_Prompt: {prompt_info['first_query_prompt']}") 
                     st.write(f"Query_Prompt: {prompt_info['query_prompt']}") 
                     st.write(f"Answer_Prompt: {prompt_info['answer_prompt']}")
                     st.write(f"Evaluate_Prompt: {prompt_info['evaluate_prompt']}")
@@ -168,12 +176,15 @@ def test_prompt():
             # # 显示上传成功的文件
             # st.write("服务器端文件上传成功：", set(server_resp))
             # st.write("本地保存的文件路径：", set(local_resp))
-            final_prompt_lst = get_final_prompt(selected_prompts, data)
+            
+            final_prompt_lst, all_num_lst = get_final_prompt(selected_prompts, data)
             st.session_state['final_prompt_lst'] = final_prompt_lst
+            st.session_state['all_num_lst'] = all_num_lst # 知晓每个种类需要多少条指令，标语后续生成轮数的数量
             
             final_prompt_df_lst = []
             for final_prompt in final_prompt_lst:
                 final_prompt_df = pd.DataFrame({
+                    'first_query_prompt': final_prompt['first_query_prompt'],
                     'query_prompt': final_prompt['query_prompt'],
                     'answer_prompt': final_prompt['answer_prompt'],
                     'evaluate_prompt': final_prompt['evaluate_prompt'],

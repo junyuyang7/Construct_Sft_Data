@@ -1,13 +1,14 @@
 import os
 from dataclasses import dataclass
 import time
-os.environ['CUDA_VISIBLE_DEVICES'] = '2,3,4,5'
 
+device_ids = '0,1'
 llm_model_dict = {
     'chatglm3-6b': "/home/yangjy/Study/ChatAgent_RAG/llm_models/chatglm3-6b/",
-    'llama-2-7b-chat': "/home/yangjy/Study/ChatAgent_RAG/llm_models/Llama-2-7b-chat/",
-    "llama-2-13b-chat": "/home/yangjy/Study/ChatAgent_RAG/llm_models/Llama-2-13b-chat/",
+    'llama-2-7b-chat': "/home/yangjy/Study/ChatAgent_RAG/llm_models/Llama-2-7b-chat-hf/",
+    "llama-2-13b-chat": "/home/yangjy/Study/ChatAgent_RAG/llm_models/Llama-2-13b-chat-hf/",
     "llama-3-8b-instruct": "/home/yangjy/Study/ChatAgent_RAG/llm_models/Meta-Llama-3.1-8B-Instruct/",
+    "qwen2-7b": "/home/yangjy/Study/ChatAgent_RAG/llm_models/Qwen2-7B-Instruct/",
 }
 
 @dataclass
@@ -18,8 +19,8 @@ class Args:
     n: int = 1
     repeat: int = None
     total_prompts: int = 1000
-    max_tokens: int = 512
-    max_model_len: int = 1024
+    max_tokens: int = 1024
+    max_model_len: int = 4096
     early_stopping: bool = True
     disable_early_stopping: bool = False
     system_prompt: bool = False
@@ -39,53 +40,428 @@ class Args:
     job_name: str = None
     timestamp: int = int(time.time())
     seed: int = None  # Random seed
+    max_memory: str = '10GiB'
 
-# 可以指定一个绝对路径，统一存放所有的Embedding和LLM模型。
-# 每个模型可以是一个单独的目录，也可以是某个目录下的二级子目录。
-# 如果模型目录名称和 MODEL_PATH 中的 key 或 value 相同，程序会自动检测加载，无需修改 MODEL_PATH 中的路径。
-MODEL_ROOT_PATH = "llm_models/"
-# model_file = 'llm_models/'
-
-# 选用的 Embedding 名称
-EMBEDDING_MODEL = "bge-large-zh"
-
-# Embedding 模型运行设备。设为 "auto" 会自动检测(会有警告)，也可手动设定为 "cuda","mps","cpu","xpu" 其中之一。
-EMBEDDING_DEVICE = "auto"
-
-# 选用的reranker模型
-RERANKER_MODEL = "bge-reranker-large"
-
-# 是否启用reranker模型
-USE_RERANKER = False
-RERANKER_MAX_LENGTH = 1024
-
-# 是否启用query-fusion
-USE_QUERY_FUSION = False
-
-# 如果需要在 EMBEDDING_MODEL 中增加自定义的关键字时配置
-EMBEDDING_KEYWORD_FILE = "keywords.txt"
-EMBEDDING_MODEL_OUTPUT_PATH = "output"
-
-# 要运行的 LLM 名称，可以包括本地模型和在线模型。列表中本地模型将在启动项目时全部加载。
-# 列表中第一个模型将作为 API 和 WEBUI 的默认模型。
-# 在这里，我们使用目前主流的两个离线模型，其中，chatglm3-6b 为默认加载模型。
-# 如果你的显存不足，可使用 Qwen-1_8B-Chat, 该模型 FP16 仅需 3.8G显存。
-
-LLM_MODELS = ["ask_model", "answer_model", "judge_model", "topic_model"]
-# LLM_MODELS = ["Qwen1.5-7B-Chat", "chatglm3-6b"]
-Agent_MODEL = None
-
-# LLM 模型运行设备。设为"auto"会自动检测(会有警告)，也可手动设定为 "cuda","mps","cpu","xpu" 其中之一。
-LLM_DEVICE = "cuda"
-
-HISTORY_LEN = 4
-
-MAX_TOKENS = 2048
-
-TEMPERATURE = 0.7
-
-# RAG-fusion产生的用户问询
-FUSION_K = 3
+stop_tokens_dict = {
+  "chatglm3-6b": {
+    "stop_tokens": [
+      "[gMASK]",
+      "sop",
+      "<|user|>",
+      "<|assistant|>"
+    ],
+    "stop_token_ids": [
+      64790,
+      64792,
+      64795,
+      64796
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "llama-3-8b-instruct": {
+    "stop_tokens": [
+      "<|eot_id|>",
+      "<|end_of_text|>",
+      "<|start_header_id|>",
+      "<|end_header_id|>"
+    ],
+    "stop_token_ids": [
+      128009,
+      128001,
+      128006,
+      128007
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ]
+  },
+  "meta-llama/Meta-Llama-3.1-8B-Instruct": {
+    "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "stop_tokens": [
+      "<|eot_id|>",
+      "<|end_of_text|>",
+      "<|start_header_id|>",
+      "<|end_header_id|>"
+    ],
+    "stop_token_ids": [
+      128009,
+      128001,
+      128006,
+      128007
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "meta-llama/Meta-Llama-3-70B-Instruct": {
+    "model_name": "meta-llama/Meta-Llama-3-70B-Instruct",
+    "stop_tokens": [
+      "<|eot_id|>",
+      "<|end_of_text|>",
+      "<|start_header_id|>",
+      "<|end_header_id|>"
+    ],
+    "stop_token_ids": [
+      128009,
+      128001,
+      128006,
+      128007
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+    },
+  "meta-llama/Meta-Llama-3.1-70B-Instruct": {
+    "model_name": "meta-llama/Meta-Llama-3.1-70B-Instruct",
+    "stop_tokens": [
+      "<|eot_id|>",
+      "<|end_of_text|>",
+      "<|start_header_id|>",
+      "<|end_header_id|>"
+    ],
+    "stop_token_ids": [
+      128009,
+      128001,
+      128006,
+      128007
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "meta-llama/Meta-Llama-3.1-405B-Instruct": {
+    "model_name": "meta-llama/Meta-Llama-3.1-405B-Instruct",
+    "stop_tokens": [
+      "<|eot_id|>",
+      "<|end_of_text|>",
+      "<|starter_header_id|>",
+      "<|end_header_id|>"
+    ],
+    "stop_token_ids": [
+      128009,
+      128001,
+      128006,
+      128007
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "lmsys/vicuna-7b-v1.5": {
+    "model_name": "lmsys/vicuna-7b-v1.5",
+    "stop_tokens": [
+      "</s>",
+      "<s>",
+      "<unk>"
+    ],
+    "stop_token_ids": [
+      2,
+      1,
+      0
+    ],
+    "stop_tokens_assistant": [
+      "ASSISTANT"
+    ],
+  },
+  "llama-2-7b-chat": {
+    "stop_tokens": [
+      "</s>",
+      "<s>",
+      "<unk>"
+    ],
+    "stop_token_ids": [
+      2,
+      1,
+      0
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "llama-2-13b-chat": {
+    "stop_tokens": [
+      "</s>",
+      "<s>",
+      "<unk>"
+    ],
+    "stop_token_ids": [
+      2,
+      1,
+      0
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "NousResearch/Nous-Hermes-llama-2-7b": {
+    "model_name": "NousResearch/Nous-Hermes-llama-2-7b",
+    "stop_tokens": [
+      "</s>",
+      "<s>",
+      "<unk>"
+    ],
+    "stop_token_ids": [
+      2,
+      1,
+      0
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+    "pre_query_template": "### Instruction:\n\n"
+  },
+  "qwen2-7b": {
+    "stop_tokens": [
+      "<|im_start|>",
+      "<|im_end|>",
+      "<|endoftext|>"
+    ],
+    "stop_token_ids": [
+      151643,
+      151644,
+      151645
+    ],
+    "stop_tokens_assistant": [
+      "Assistant",
+      "assistant"
+    ],
+  },
+  "Qwen/Qwen2-7B-Instruct": {
+    "model_name": "Qwen/Qwen2-7B-Instruct",
+    "stop_tokens": [
+      "<|im_start|>",
+      "<|im_end|>",
+      "<|endoftext|>"
+    ],
+    "stop_token_ids": [
+      151643,
+      151644,
+      151645
+    ],
+    "stop_tokens_assistant": [
+      "Assistant",
+      "assistant"
+    ],
+  },
+  "Qwen/Qwen2-Math-7B-Instruct": {
+    "model_name": "Qwen/Qwen2-Math-7B-Instruct",
+    "stop_tokens": [
+      "<|im_start|>",
+      "<|im_end|>",
+      "<|endoftext|>"
+    ],
+    "stop_token_ids": [
+      151643,
+      151644,
+      151645
+    ],
+    "stop_tokens_assistant": [
+      "Assistant",
+      "assistant"
+    ],
+  },
+  "Qwen/Qwen1.5-7B-Chat": {
+    "model_name": "Qwen/Qwen1.5-7B-Chat",
+    "stop_tokens": [
+      "<|im_start|>",
+      "<|im_end|>",
+      "<|endoftext|>"
+    ],
+    "stop_token_ids": [
+      151643,
+      151644,
+      151645
+    ],
+    "stop_tokens_assistant": [
+      "Assistant",
+      "assistant"
+    ],
+  },
+  "mistralai/Mistral-7B-Instruct-v0.3": {
+    "model_name": "mistralai/Mistral-7B-Instruct-v0.3",
+    "stop_tokens": [
+      "<s>",
+      "</s>",
+      "[INST]",
+      "[/INST]"
+    ],
+    "stop_token_ids": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "google/gemma-1.1-7b-it": {
+    "model_name": "google/gemma-1.1-7b-it",
+    "stop_tokens": [
+      "<eos>",
+      "<bos>",
+      "<start_of_turn>",
+      "<end_of_turn>"
+    ],
+    "stop_token_ids": [
+      1,
+      2,
+      106,
+      107
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "google/gemma-2-27b-it": {
+    "model_name": "google/gemma-2-27b-it",
+    "stop_tokens": [
+      "<eos>",
+      "<bos>",
+      "<end_of_turn>"
+    ],
+    "stop_token_ids": [
+      1,
+      2,
+      107
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "google/gemma-2-9b-it": {
+    "model_name": "google/gemma-2-9b-it",
+    "stop_tokens": [
+      "<eos>",
+      "<bos>",
+      "<end_of_turn>"
+    ],
+    "stop_token_ids": [
+      1,
+      2,
+      107
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "microsoft/Phi-3-mini-128k-instruct": {
+    "model_name": "microsoft/Phi-3-mini-128k-instruct",
+    "stop_tokens": [
+      "</s>",
+      "<s>",
+      "<unk>",
+      "<|endoftext|>",
+      "<|user|>",
+      "<|assistant|>",
+      "<|system|>",
+      "<|end|>"
+    ],
+    "stop_token_ids": [
+      2,
+      1,
+      0,
+      32000,
+      32001,
+      32006,
+      32007,
+      32010
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "microsoft/Phi-3-small-128k-instruct": {
+    "model_name": "microsoft/Phi-3-small-128k-instruct",
+    "stop_tokens": [
+      "</s>",
+      "<s>",
+      "<unk>",
+      "<|endoftext|>",
+      "<|user|>",
+      "<|assistant|>",
+      "<|system|>",
+      "<|end|>"
+    ],
+    "stop_token_ids": [
+      2,
+      1,
+      0,
+      32000,
+      32001,
+      32006,
+      32007,
+      32010
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "microsoft/Phi-3-medium-128k-instruct": {
+    "model_name": "microsoft/Phi-3-medium-128k-instruct",
+    "stop_tokens": [
+      "</s>",
+      "<s>",
+      "<unk>",
+      "<|endoftext|>",
+      "<|user|>",
+      "<|assistant|>",
+      "<|system|>",
+      "<|end|>"
+    ],
+    "stop_token_ids": [
+      2,
+      1,
+      0,
+      32000,
+      32001,
+      32006,
+      32007,
+      32010
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "01-ai/Yi-1.5-34B-Chat": {
+    "model_name": "01-ai/Yi-1.5-34B-Chat",
+    "stop_tokens": [
+      "<|startoftext|>",
+      "<|endoftext|>",
+      "<|im_end|>"
+    ],
+    "stop_token_ids": [
+      1,
+      2,
+      7
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  },
+  "deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct": {
+    "model_name": "deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct",
+    "stop_tokens": [
+      "<｜begin▁of▁sentence｜>",
+      "<｜end▁of▁sentence｜>",
+      "<|EOT|>",
+      "<｜User｜>",
+      "<｜Assistant｜>"
+    ],
+    "stop_token_ids": [
+      100000,
+      100001,
+      100008,
+      100006,
+      100007
+    ],
+    "stop_tokens_assistant": [
+      "assistant"
+    ],
+  }
+}
 
 ONLINE_LLM_MODEL = {
     "openai-api": {

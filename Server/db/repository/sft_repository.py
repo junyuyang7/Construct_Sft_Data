@@ -1,5 +1,5 @@
-from Script.db.models.sft_data_base import SFTDataModel
-from Script.db.session import with_session
+from Server.db.models.sft_data_base import SFTDataModel
+from Server.db.session import with_session
 from sqlalchemy.orm import Session
 from typing import List
 

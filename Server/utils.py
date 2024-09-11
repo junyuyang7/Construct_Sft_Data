@@ -1,5 +1,5 @@
-from Script.config import HTTPX_DEFAULT_TIMEOUT, logger, log_verbose, MODEL_PATH, MODEL_ROOT_PATH, LLM_DEVICE
-from Script.config.model_config import LLM_MODELS
+from Server.config import HTTPX_DEFAULT_TIMEOUT, logger, log_verbose, MODEL_PATH, MODEL_ROOT_PATH, LLM_DEVICE
+from Server.config.model_config import LLM_MODELS
 from typing import *
 import os
 import logging
@@ -71,9 +71,9 @@ def get_model_worker_config(model_name: str = None) -> dict:
     加载model worker的配置项。
     优先级:FSCHAT_MODEL_WORKERS[model_name] > ONLINE_LLM_MODEL[model_name] > FSCHAT_MODEL_WORKERS["default"]
     '''
-    from Script.config.model_config import ONLINE_LLM_MODEL, MODEL_PATH
-    from Script.config.server_config import FSCHAT_MODEL_WORKERS
-    from Script import model_workers
+    from Server.config.model_config import ONLINE_LLM_MODEL, MODEL_PATH
+    from Server.config.server_config import FSCHAT_MODEL_WORKERS
+    from Server import model_workers
 
     config = FSCHAT_MODEL_WORKERS.get("default", {}).copy()
     os.environ["CUDA_VISIBLE_DEVICES"]= config["gpus"]
@@ -100,7 +100,7 @@ def get_model_worker_config(model_name: str = None) -> dict:
 
 # 获取地址
 def fschat_controller_address() -> str:
-    from Script.config.server_config import FSCHAT_CONTROLLER
+    from Server.config.server_config import FSCHAT_CONTROLLER
 
     host = FSCHAT_CONTROLLER["host"]
     if host == "0.0.0.0":
@@ -120,7 +120,7 @@ def fschat_model_worker_address(model_name: str = LLM_MODELS[0]) -> str:
 
 
 def fschat_openai_api_address() -> str:
-    from Script.config.server_config import FSCHAT_OPENAI_API
+    from Server.config.server_config import FSCHAT_OPENAI_API
 
     host = FSCHAT_OPENAI_API["host"]
     if host == "0.0.0.0":
@@ -130,7 +130,7 @@ def fschat_openai_api_address() -> str:
 
 
 def api_address() -> str:
-    from Script.config.server_config import API_SERVER
+    from Server.config.server_config import API_SERVER
 
     host = API_SERVER["host"]
     if host == "0.0.0.0":
@@ -140,7 +140,7 @@ def api_address() -> str:
 
 
 def webui_address() -> str:
-    from Script.config.server_config import WEBUI_SERVER
+    from Server.config.server_config import WEBUI_SERVER
 
     host = WEBUI_SERVER["host"]
     port = WEBUI_SERVER["port"]

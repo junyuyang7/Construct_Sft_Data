@@ -4,12 +4,12 @@
 # 3.删除数据库中的模板 
 # 4.修改数据库中的模板
 
-# from Script.db.models import PromptModel
+# from Server.db.models import PromptModel
 from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy import Column, Integer, String, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-# from Script.create_db import DBconnecter
+# from Server.create_db import DBconnecter
 import requests
 import streamlit as st
 from st_aggrid import AgGrid, JsCode, GridUpdateMode
@@ -182,7 +182,7 @@ def prompt_base_page():
                 st.dataframe(data, width=800, height=400)
                 st.subheader('如果需要修改数据，请填写以下信息。')
             if tabel_name == 'all_prompt':
-                first_query_prompt = st.text_input("first_query_prompt", key="first_query_prompt",)
+                first_query_prompt = st.text_input("first_query_prompt(必须包含{$num})", key="first_query_prompt",)
                 
                 query_prompt = st.text_input("query_prompt", key="query_prompt",)
                 
@@ -190,7 +190,7 @@ def prompt_base_page():
                 
                 evaluate_prompt = st.text_input("evaluate_prompt", key="evaluate_prompt",)
                 
-                first_query_args = st.text_input("first_query_prompt 中含有的参数，请用空格分开同种类型的，用;(英文)分开不同类型的", key="first_query_args",)
+                first_query_args = st.text_input("first_query_prompt 中含有的参数，请用空格分开同种类型的(必定要有num，表示你需要生成的first_query数量)，用;(英文)分开不同类型的", key="first_query_args",)
                 
                 query_args = st.text_input("query_prompt 中含有的参数，请用空格分开同种类型的，用;(英文)分开不同类型的", key="query_args",)
                 

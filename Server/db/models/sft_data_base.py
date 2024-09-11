@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import Column, DateTime, String, Integer, ForeignKey
-from Script.db.models.base import BaseModel
+from Server.db.models.base import BaseModel
 
 class SFTDataModel(BaseModel):
     __tablename__ = 'sftdata_model'  # 定义数据库表的名称

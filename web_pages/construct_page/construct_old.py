@@ -12,7 +12,7 @@ from streamlit_option_menu import option_menu
 from fastapi import UploadFile
 import os
 from typing import *
-from Script.config import KEYWORD_FILE, DATA_FILE
+from Server.config import KEYWORD_FILE, DATA_FILE
 import pandas as pd
 import re
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, AgGridTheme
