@@ -2,6 +2,8 @@ import os
 from dataclasses import dataclass
 import time
 
+SENTENCEBERT_MODEL = 'paraphrase-MiniLM-L6-v2' # 计算 KNN-i 指标
+
 device_ids = '0,1'
 llm_model_dict = {
     'chatglm3-6b': "/home/yangjy/Study/ChatAgent_RAG/llm_models/chatglm3-6b/",

@@ -9,8 +9,12 @@ import json
 from abc import ABC, abstractmethod
 from sqlalchemy import create_engine, and_, or_, MetaData, text, inspect
 from sqlalchemy.orm import sessionmaker
-from Server.db.models import QueryPrompt, AnswerPrompt, EvaluatePrompt, AllPrompt, SFTDataModel, FirstQueryPrompt
+from Server.db.models import QueryPrompt, AnswerPrompt, EvaluatePrompt, AllPrompt, SFTDataModel, FirstQueryPrompt, RawDialogModel
+
 from Server.db.repository import (PromptAction, add_history_to_db, list_history_from_db, find_history_from_keyword, history_exists, delete_history_from_db, update_history_from_db)
+
+from Server.db.repository import (add_raw_data_to_db, list_raw_data_from_db, find_raw_data_from_keyword, delete_raw_data_from_db, update_raw_data_from_db)
+
 from sqlalchemy.exc import SQLAlchemyError
 from utils import get_db_path
 from Server.config import SQLALCHEMY_DATABASE_URI
@@ -21,7 +25,8 @@ ModelType = {
     'first_query_prompt': FirstQueryPrompt,
     'query_prompt': QueryPrompt,
     'all_prompt': AllPrompt,
-    'sftdata_model': SFTDataModel
+    'sftdata_model': SFTDataModel,
+    'rawdata_model': RawDialogModel
 }
 
 ModelAction = {
@@ -76,6 +81,13 @@ db_excutor = {
         'find': find_history_from_keyword,
         'delete': delete_history_from_db,
         'update': update_history_from_db
+    },
+    'rawdata_model': {
+        'add': add_raw_data_to_db,
+        'list_all': list_raw_data_from_db,
+        'find': find_raw_data_from_keyword,
+        'delete': delete_raw_data_from_db,
+        'update': update_raw_data_from_db
     }
 }
 
@@ -137,55 +149,20 @@ class DBService(ABC):
         session = Session()
         session.close()
 
-    def insert_data(self, domain_name, task_name, cls_name, args, first_query_args, query_args, answer_args, evaluate_args, first_query_prompt, query_prompt, answer_prompt, evaluate_prompt, prompt):
-        # args 格式 aaa bbb ccc ddd; abc bcd dfg
-        args_json, query_json, answer_json, evaluate_json = None, None, None, None
-
-        if self.tabel_name == 'all_prompt':
-            try:
-                query_json, answer_json, evaluate_json = query_args.split(';'), answer_args.split(';'), evaluate_args.split(';')
-
-                query_json = {'input_args': query_json[0].split(),
-                            'iter_args': query_json[1].split()}
-                answer_json = {'input_args': answer_json[0].split(),
-                            'iter_args': answer_json[1].split()}
-                evaluate_json = {'input_args': evaluate_json[0].split(),
-                            'iter_args': evaluate_json[1].split()}
-            except:
-                query_json = {'input_args': query_args.split()}
-                answer_json = {'input_args': answer_args.split()}
-                evaluate_json = {'input_args': evaluate_args.split()}
-            
-            query_json, answer_json, evaluate_json = json.dumps(query_json), json.dumps(answer_json), json.dumps(evaluate_json)
-
-        else:
-            try:
-                args_json = args.split(';')
-                args_json = {'input_args': args_json[0].split(),
-                     'iter_args': args_json[1].split()}
-            except:
-                args_json = {'input_args': args.split()}
-            args_json = json.dumps(args_json)
-
-        # 检查是否存在重复记录（排除id）
-        status = db_excutor[self.tabel_name]['add'](domain_name, task_name, cls_name, args, first_query_args, query_args, answer_args, evaluate_args, first_query_prompt, query_prompt, answer_prompt, evaluate_prompt, prompt)
-        return status
+    def insert_data(self):
+        pass
     
     def get_data_by_keyword(self, keyword):
-        status, prompt_dict = db_excutor[self.tabel_name]['find'](keyword)
-        return status, prompt_dict
+        pass
 
     def get_all_data(self):
-        resp = db_excutor[self.tabel_name]['list_all']()
-        return resp
+        pass
 
     def update_data(self, prompt_id, **kwargs):
-        status = db_excutor[self.tabel_name]['update'](prompt_id, **kwargs)
-        return status
+        pass
 
     def delete_data(self, prompt_id):
-        status = db_excutor[self.tabel_name]['delete'](prompt_id)
-        return status
+        pass
     
     def do_init(self):
         """初始化操作，子类可以扩展或重写此方法"""
@@ -203,57 +180,17 @@ if __name__ == '__main__':
     # print(status)
     db = DBService(tabel_name='query_prompt')
     status = db.recreate_table()
-    status = db.insert_data('test', 'test', 'test', 'test', 'test', 'test', 'test', 'test','test', 'test', 'test', 'test', 'test')
     print(status)
     db = DBService(tabel_name='first_query_prompt')
     status = db.recreate_table()
-    status = db.insert_data('test', 'test', 'test', 'test', 'test', 'test', 'test', 'test','test', 'test', 'test', 'test', 'test')
     print(status)
     db = DBService(tabel_name='answer_prompt')
     status = db.recreate_table()
-    status = db.insert_data('test', 'test', 'test', 'test', 'test', 'test', 'test', 'test','test', 'test', 'test', 'test', 'test')
     print(status)
     db = DBService(tabel_name='evaluate_prompt')
     status = db.recreate_table()
-    status = db.insert_data('test', 'test', 'test', 'test', 'test', 'test', 'test', 'test','test', 'test', 'test', 'test', 'test')
     print(status)
     db = DBService(tabel_name='all_prompt')
     status = db.recreate_table()
-    status = db.insert_data('test', 'test', 'test', 'test', 'test', 'test', 'test', 'test','test', 'test', 'test', 'test', 'test')
     print(status)
-    # from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table
-    # from sqlalchemy.ext.declarative import declarative_base
-    # from sqlalchemy.orm import sessionmaker
-
-    # engine = create_engine('sqlite:///D:/Works/Construct_Sft_Data/knowledge_base/test.db', echo=True)
-
-    # # 创建一个基类
-    # Base = declarative_base()
-
-    # # 定义表结构
-    # class MyTable(Base):
-    #     __tablename__ = 'my_table'  # 表名
-
-    #     id = Column(Integer, primary_key=True)
-    #     name = Column(String)
-    #     age = Column(Integer)
-
-    # # 创建表
-    # Base.metadata.create_all(engine)
-
-    # # 验证表是否创建成功
-    # Session = sessionmaker(bind=engine)
-    # session = Session()
-
-    # # 插入数据测试
-    # new_entry = MyTable(name="Alice", age=30)
-    # session.add(new_entry)
-    # session.commit()
-
-    # # 查询数据测试
-    # result = session.query(MyTable).all()
-    # for row in result:
-    #     print(f"ID: {row.id}, Name: {row.name}, Age: {row.age}")
-
-    # session.close()
     

@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import pandas as pd
 import json
-from Server.db.repository.sft_repository import (add_history_to_db, list_history_from_db, history_exists, delete_history_from_db)
+from Server.db.repository.dialog_repository import (add_history_to_db, list_history_from_db, history_exists, delete_history_from_db)
 from Server.db.repository.prompt_repository import (add_prompt_to_db, list_prompts_from_db, prompt_exists, delete_prompt_from_db)
 
 class DialogConstruct(DataConstructer):

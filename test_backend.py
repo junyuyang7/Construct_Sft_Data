@@ -4,7 +4,7 @@ import uvicorn
 from typing import *
 import os
 # from Server.create_db import DBconnecter
-from Server.data_base.kb_service import DBService
+from Server.data_base.kb_service import DBService, PromptService
 import json
 import torch
 from transformers import AutoConfig, AutoModel, AutoTokenizer, LlamaForCausalLM
@@ -76,7 +76,7 @@ def load_model(model_name):
     global llm_model
     
     if llm_model is not None:
-        # 释放原有模型的显存
+        # 切换模型，释放原有模型的显存
         del llm_model
         torch.cuda.empty_cache()
         
@@ -110,6 +110,7 @@ async def chat(message: Message):
         
     return {"response": resp, 'chat_lst': chat_lst}
 
+
 # Construct Data API
 @app.post("/upload/")
 async def upload(files: List[UploadFile]):
@@ -134,14 +135,14 @@ async def construct_sft_data(request: Request):
     
     if not model_name or final_prompt_lst:
         return {"error": "Model name not provided"}
-    ans_df_lst, filter_prompt_lst = construct_dialog(final_prompt_lst, llm_model)
+    ans_df_lst, raw_prompt_lst = construct_dialog(final_prompt_lst, llm_model)
     
-    return {'ans_df_lst': ans_df_lst, 'filter_prompt_lst': filter_prompt_lst}
+    return {'ans_df_lst': ans_df_lst, 'filter_prompt_lst': raw_prompt_lst}
 
 # Prompt_Base API
 @app.post('/prompt_upload/')
 async def prompt_upload(prompt_data: PromptBase):
-    db = DBService(tabel_name=prompt_data.tabel_name)
+    db = PromptService(tabel_name=prompt_data.tabel_name)
     status = db.insert_data(prompt_data.domain_name, 
                             prompt_data.task_name, 
                             prompt_data.cls_name, 
@@ -159,27 +160,27 @@ async def prompt_upload(prompt_data: PromptBase):
 
 @app.post('/prompt_list/')
 async def prompt_list(prompt_data: PromptList):
-    db = DBService(tabel_name=prompt_data.tabel_name)
+    db = PromptService(tabel_name=prompt_data.tabel_name)
     prompt_dict = db.get_all_data()
     # prompt_dict = [{}, {}, {}, ....] List[dict]
     return {'data': prompt_dict}
     
 @app.post('/prompt_delete/')
 async def prompt_delete(prompt_data: PromptList):
-    db = DBService(tabel_name=prompt_data.tabel_name)
+    db = PromptService(tabel_name=prompt_data.tabel_name)
     resp = db.delete_data(prompt_data.prompt_id)
     return {'status': resp}
 
 # TODO
 @app.post('/prompt_search_keyword/')
 async def prompt_search(prompt_data: PromptBase):
-    db = DBService(tabel_name=prompt_data.tabel_name)
+    db = PromptService(tabel_name=prompt_data.tabel_name)
     status, prompt_dict = db.get_data_by_keyword(prompt_data.keyword)
     return {'status': status, 'data': prompt_dict}
 
 @app.post('/prompt_update/')
 async def prompt_update(prompt_data: PromptBase):
-    db = DBService(tabel_name=prompt_data.tabel_name)
+    db = PromptService(tabel_name=prompt_data.tabel_name)
     resp = db.update_data(prompt_data.domain_name, 
                         prompt_data.task_name, 
                         prompt_data.cls_name, 
@@ -195,7 +196,7 @@ async def prompt_update(prompt_data: PromptBase):
                         prompt_data.prompt)
     return {'status': resp, 'prompt_data': prompt_data.model_dump()}
 
-# SftData_base api
+# Filtter data
 
 
 if __name__ == "__main__":

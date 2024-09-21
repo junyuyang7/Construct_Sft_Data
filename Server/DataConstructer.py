@@ -6,6 +6,9 @@ from Server.model_workers.base import LLMModelBase, Args
 from typing import *
 import json
 import pandas as pd
+from tqdm import tqdm
+
+from Server.data_base.kb_service import RawDialogDBService
 
 class DataConstructer:
     def __init__(self, llm_model: LLMModelBase):
@@ -102,6 +105,37 @@ class DataConstructer:
         return final_df
     
     def construct_dialogs(self, final_prompt_lst: List[dict]):
+        '''
+        final_prompt_lst sample:
+        [
+        {
+        'first_query_prompt': 'xxx',
+        'query_prompt': 'xxx',
+        'answer_prompt': 'xxx',
+        'evaluate_prompt': 'xxx',
+        'turn_lst': [5,2,3,4],
+        'chat': [
+              [{'role': 'user', 'content': 'xxxx'}, {'role': 'assistant', 'content': 'xxxx'}, ...],
+              [[{'role': 'user', 'content': 'xxxx'}, {'role': 'assistant', 'content': 'xxxx'}, ...],
+              [[{'role': 'user', 'content': 'xxxx'}, {'role': 'assistant', 'content': 'xxxx'}, ...],
+              [[{'role': 'user', 'content': 'xxxx'}, {'role': 'assistant', 'content': 'xxxx'}, ...]
+            ],
+        },
+        {
+        'first_query_prompt': 'xxx',
+        'query_prompt': 'xxx',
+        'answer_prompt': 'xxx',
+        'evaluate_prompt': 'xxx',
+        'turn_lst': [5,2,3,4],
+        'chat': [
+              [{'role': 'user', 'content': 'xxxx'}, {'role': 'assistant', 'content': 'xxxx'}, ...],
+              [[{'role': 'user', 'content': 'xxxx'}, {'role': 'assistant', 'content': 'xxxx'}, ...],
+              [[{'role': 'user', 'content': 'xxxx'}, {'role': 'assistant', 'content': 'xxxx'}, ...],
+              [[{'role': 'user', 'content': 'xxxx'}, {'role': 'assistant', 'content': 'xxxx'}, ...]
+            ],
+        }
+        ]
+        '''
         final_df_lst = []
         
         
@@ -112,7 +146,7 @@ class DataConstructer:
             final_df_all = pd.DataFrame({
                 'full_dialog': [],
                 'dialog': [],
-                'score': [] ,
+                'score': [],
                 'reason': []
             })
                 
@@ -127,14 +161,31 @@ class DataConstructer:
                 full_dialog_lst = self.construct_mt_dialog(qp, ap, turns, first_dialog_lst)
                 final_prompt_lst[i]['chat'] = full_dialog_lst
                 
-                # 3.进行评估
-                final_df = self.evaluate_dialog(ep, full_dialog_lst)
-                final_df_all = pd.concat([final_df_all, final_df], ignore_index=True)
+                # # 3.进行评估
+                # final_df = self.evaluate_dialog(ep, full_dialog_lst)
+                # final_df_all = pd.concat([final_df_all, final_df], ignore_index=True)
                 
             final_df_lst.append(final_df_all)
 
+        # 储存最初数据的结果
+        self.save_raw_dialog(final_prompt_lst)
+
         # 5.返回评估的结果
         return final_df_lst, final_prompt_lst
+    
+    def save_raw_dialog(self, final_prompt_lst):
+        chat_list, turn_list = [], []
+        db_seveice = RawDialogDBService(tabel_name='raw_dialog')
+        for final_prompt in final_prompt_lst:
+            for chat, turn in tqdm(zip(final_prompt['chat'], final_prompt['turn_lst']), total=len(final_prompt)):
+                chat_list.append(chat)
+                turn_list.append(turn)
+                status = db_seveice.insert_data(chat, turn)
+                if not status:
+                    raise "储存 raw_dialog 出现错误"
+        
+        print("raw data 储存成功")
+
     
     # 多种指标进行筛选（看论文）
     def filter_dialogs(self, final_df_lst):

@@ -115,20 +115,26 @@ class LLMModelBase:
             #     trust_remote_code=True,
             # )
             
-    def get_loss(self, prompt):
-        if self.args.engine == "vllm":
-            return 
-        
-        elif self.args.engine == "hf":
-            inputs = self.tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).to(self.model.device) 
-            output = self.model.generate(**inputs, do_sample=False)
-            # output = self.model.generate(**inputs,
-            #                         do_sample=True, 
-            #                         temperature=self.args.temperature, 
-            #                         top_p=self.args.top_p, 
-            #                         max_length=self.args.max_tokens, 
-            #                         num_return_sequences=1,
-            #                         )
+    # 获取 loss 的接口
+    def get_loss(self, dialog, output=None):
+        temp_dialog = self.get_template_dialog_single(dialog, prompt='')
+
+        input_ids = self.tokenizer(temp_dialog, return_tensors="pt", truncation=True, max_length=self.args.max_tokens)["input_ids"].to(self.model.device) 
+
+        if output is None:
+            target_ids = input_ids.clone().to(self.model.device)
+        else:
+            start_index = temp_dialog.rfind(output)
+            start_token = len(self.tokenizer.encode(temp_dialog[:start_index]))
+            end_token = input_ids.shape[1]
+
+            target_ids = input_ids.clone()
+            target_ids[0, :start_token] = -100
+        with torch.no_grad():
+            outputs = self.model(input_ids=input_ids, labels=target_ids)
+        loss = outputs.loss.clone().detach().to('cpu')
+        del input_ids, target_ids, outputs
+        return loss
 
     def generate(self, prompt, chat_lst):
         '''chat_lst = [{}, {}, {}]'''
@@ -142,7 +148,7 @@ class LLMModelBase:
         elif self.args.engine == "hf":
             inputs = self.tokenizer.encode(template, return_tensors="pt", padding=True, truncation=True, add_special_tokens=False).to('cuda').to(self.model.device) 
 
-            output = self.model.generate(**inputs, do_sample=False)
+            # output = self.model.generate(**inputs, do_sample=False)
             output = self.model.generate(inputs,
                                     do_sample=True, 
                                     temperature=self.args.temperature, 
@@ -191,6 +197,12 @@ class LLMModelBase:
         
         return outputs_lst, mask_index
     
+    def get_template_dialog_single(self, dialog, prompt):
+        template = self.tokenizer.apply_chat_template(dialog, tokenize=False, add_generation_prompt=False)
+        template += prompt
+            
+        return template
+
     def get_template_dialog(self, dialog_lst, prompt):
         temp_lst = []
         new_dialog_lst = []
@@ -296,7 +308,7 @@ class LLMModelBase:
         temp_lst, _ = self.get_template_dialog(first_dialog_lst, query_prompt)
         
         for i in range(2, max_turn+1):
-            # 标记每个prompt是否已经生成到头了
+            # 标记每个prompt是否已经生成到头了，已经到了对应的轮数了
             is_end_lst = [1 if t >= i else 0 for t in turn_lst]
             # 生成指令 query
             query_lst, mask_index = self.generate_mask(temp_lst, is_end_lst)
